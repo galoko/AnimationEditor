@@ -1,4 +1,5 @@
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+#define GLEW_STATIC
 // Windows Header Files:
 #include <windows.h>
 #include <WindowsX.h>
@@ -6,15 +7,21 @@
 #include <string>
 #include <iostream>
 
+#include <GL/glew.h>
+
 #include <GL/gl.h>			/* OpenGL header file */
 #include <GL/glu.h>			/* OpenGL utilities header file */
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include "shader.hpp"
 
 #pragma comment (lib, "opengl32.lib")
 #pragma comment (lib, "glu32.lib")
 
 using namespace std;
+using namespace glm;
 
 static HWND WindowHandle;
 static HDC WindowDC;
@@ -66,12 +73,216 @@ double TimeToSeconds(LONGLONG Time) {
 	return (double)Time / (double)Freq.QuadPart;
 } 
 
+static GLuint programID;
+static GLuint MatrixID;
+static mat4 MVP;
+static GLuint vertexbuffer;
+static GLuint colorbuffer;
+
+static mat4 Projection;
+static mat4 View;
+static mat4 Model;
+
+void SetupWindow(void) {
+
+	PIXELFORMATDESCRIPTOR PixelFormatDesc =
+	{
+		sizeof(PIXELFORMATDESCRIPTOR),
+		1,
+		PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+		PFD_TYPE_RGBA,
+		32,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		24,                   // Number of bits for the depthbuffer
+		8,                    // Number of bits for the stencilbuffer
+		0,                    // Number of Aux buffers in the framebuffer.
+		PFD_MAIN_PLANE,
+		0, 0, 0, 0
+	};
+
+	WindowDC = GetDC(WindowHandle);
+	int PixelFormat = ChoosePixelFormat(WindowDC, &PixelFormatDesc);
+	SetPixelFormat(WindowDC, PixelFormat, &PixelFormatDesc);
+
+	HGLRC hGL = wglCreateContext(WindowDC);
+	if (!wglMakeCurrent(WindowDC, hGL))
+		throw new runtime_error("Couldn't assign DC to OpenGL");
+
+	glewExperimental = true; // Needed for core profile
+	if (glewInit() != GLEW_OK)
+		throw new runtime_error("Couldn't init GLEW");
+
+	glEnable(GL_DEPTH_TEST);
+
+	GLuint VertexArrayID;
+	glGenVertexArrays(1, &VertexArrayID);
+	glBindVertexArray(VertexArrayID);
+
+	// Create and compile our GLSL program from the shaders
+	programID = LoadShaders("TransformVertexShader.vertexshader", "ColorFragmentShader.fragmentshader");
+
+	// Get a handle for our "MVP" uniform
+	MatrixID = glGetUniformLocation(programID, "MVP");
+
+	// Projection matrix : 45° Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
+	Projection = perspective(radians(45.0f), 4.0f / 3.0f, 0.1f, 100.0f);
+	// Camera matrix
+	View = lookAt(
+		vec3(0, -5, 0), // Camera is at (4,3,-3), in World Space
+		vec3(0, 0, 0), // and looks at the origin
+		vec3(0, 0, 1)  // Head is up (set to 0,-1,0 to look upside-down)
+	);
+
+											   // Our vertices. Tree consecutive floats give a 3D vertex; Three consecutive vertices give a triangle.
+											   // A cube has 6 faces with 2 triangles each, so this makes 6*2=12 triangles, and 12*3 vertices
+	static const GLfloat g_vertex_buffer_data[] = {
+		-1.0f,-1.0f,-1.0f,
+		-1.0f,-1.0f, 1.0f,
+		-1.0f, 1.0f, 1.0f,
+		1.0f, 1.0f,-1.0f,
+		-1.0f,-1.0f,-1.0f,
+		-1.0f, 1.0f,-1.0f,
+		1.0f,-1.0f, 1.0f,
+		-1.0f,-1.0f,-1.0f,
+		1.0f,-1.0f,-1.0f,
+		1.0f, 1.0f,-1.0f,
+		1.0f,-1.0f,-1.0f,
+		-1.0f,-1.0f,-1.0f,
+		-1.0f,-1.0f,-1.0f,
+		-1.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f,-1.0f,
+		1.0f,-1.0f, 1.0f,
+		-1.0f,-1.0f, 1.0f,
+		-1.0f,-1.0f,-1.0f,
+		-1.0f, 1.0f, 1.0f,
+		-1.0f,-1.0f, 1.0f,
+		1.0f,-1.0f, 1.0f,
+		1.0f, 1.0f, 1.0f,
+		1.0f,-1.0f,-1.0f,
+		1.0f, 1.0f,-1.0f,
+		1.0f,-1.0f,-1.0f,
+		1.0f, 1.0f, 1.0f,
+		1.0f,-1.0f, 1.0f,
+		1.0f, 1.0f, 1.0f,
+		1.0f, 1.0f,-1.0f,
+		-1.0f, 1.0f,-1.0f,
+		1.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f,-1.0f,
+		-1.0f, 1.0f, 1.0f,
+		1.0f, 1.0f, 1.0f,
+		-1.0f, 1.0f, 1.0f,
+		1.0f,-1.0f, 1.0f
+	};
+
+	// One color for each vertex. They were generated randomly.
+	static const GLfloat g_color_buffer_data[] = {
+		0.583f,  0.771f,  0.014f,
+		0.609f,  0.115f,  0.436f,
+		0.327f,  0.483f,  0.844f,
+		0.822f,  0.569f,  0.201f,
+		0.435f,  0.602f,  0.223f,
+		0.310f,  0.747f,  0.185f,
+		0.597f,  0.770f,  0.761f,
+		0.559f,  0.436f,  0.730f,
+		0.359f,  0.583f,  0.152f,
+		0.483f,  0.596f,  0.789f,
+		0.559f,  0.861f,  0.639f,
+		0.195f,  0.548f,  0.859f,
+		0.014f,  0.184f,  0.576f,
+		0.771f,  0.328f,  0.970f,
+		0.406f,  0.615f,  0.116f,
+		0.676f,  0.977f,  0.133f,
+		0.971f,  0.572f,  0.833f,
+		0.140f,  0.616f,  0.489f,
+		0.997f,  0.513f,  0.064f,
+		0.945f,  0.719f,  0.592f,
+		0.543f,  0.021f,  0.978f,
+		0.279f,  0.317f,  0.505f,
+		0.167f,  0.620f,  0.077f,
+		0.347f,  0.857f,  0.137f,
+		0.055f,  0.953f,  0.042f,
+		0.714f,  0.505f,  0.345f,
+		0.783f,  0.290f,  0.734f,
+		0.722f,  0.645f,  0.174f,
+		0.302f,  0.455f,  0.848f,
+		0.225f,  0.587f,  0.040f,
+		0.517f,  0.713f,  0.338f,
+		0.053f,  0.959f,  0.120f,
+		0.393f,  0.621f,  0.362f,
+		0.673f,  0.211f,  0.457f,
+		0.820f,  0.883f,  0.371f,
+		0.982f,  0.099f,  0.879f
+	};
+
+	glGenBuffers(1, &vertexbuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
+	
+	glGenBuffers(1, &colorbuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, colorbuffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(g_color_buffer_data), g_color_buffer_data, GL_STATIC_DRAW);
+
+	glClearColor(1, 1, 1, 1);
+
+	// Use our shader
+	glUseProgram(programID);
+
+	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+	glVertexAttribPointer(
+		0,                  // attribute. No particular reason for 0, but must match the layout in the shader.
+		3,                  // size
+		GL_FLOAT,           // type
+		GL_FALSE,           // normalized?
+		0,                  // stride
+		(void*)0            // array buffer offset
+	);
+
+	glEnableVertexAttribArray(1);
+	glBindBuffer(GL_ARRAY_BUFFER, colorbuffer);
+	glVertexAttribPointer(
+		1,                                // attribute. No particular reason for 1, but must match the layout in the shader.
+		3,                                // size
+		GL_FLOAT,                         // type
+		GL_FALSE,                         // normalized?
+		0,                                // stride
+		(void*)0                          // array buffer offset
+	);
+
+	// glDisableVertexAttribArray(0);
+	// glDisableVertexAttribArray(1);
+}
+
+void HandleResize(int Width, int Height) {
+
+	glViewport(0, 0, Width, Height);
+}
+
+static float angle;
+
+void DrawScene(void) {
+
+	// Advance scene
+	angle += radians(12.0f) / 60.0f;
+
+	// Prepare MVP
+	Model = rotate(rotate(rotate(mat4(1.0f), angle, vec3(0, 0, 1)), angle, vec3(0, 1, 0)), angle, vec3(1, 0, 0));
+	MVP = Projection * View * Model;
+	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
+
+	// Clear the screen
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// Draw the triangles !
+	glDrawArrays(GL_TRIANGLES, 0, 12 * 3); // 12*3 indices starting at 0 -> 12 triangles
+
+	glFlush();
+	SwapBuffers(WindowDC);
+}
+
 void ProcessMouseInput(LONG dx, LONG dy) {
 
 }
-
-static GLfloat trans[3];			/* current translation */
-static GLfloat rot[2];				/* current rotation */
 
 LRESULT CALLBACK WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
@@ -79,39 +290,30 @@ LRESULT CALLBACK WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 	{
 	case WM_CREATE: {
 
-		PIXELFORMATDESCRIPTOR PixelFormatDesc =
-		{
-			sizeof(PIXELFORMATDESCRIPTOR),
-			1,
-			PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,    //Flags
-			PFD_TYPE_RGBA,        // The kind of framebuffer. RGBA or palette.
-			32,                   // Colordepth of the framebuffer.
-			0, 0, 0, 0, 0, 0,
-			0,
-			0,
-			0,
-			0, 0, 0, 0,
-			24,                   // Number of bits for the depthbuffer
-			8,                    // Number of bits for the stencilbuffer
-			0,                    // Number of Aux buffers in the framebuffer.
-			PFD_MAIN_PLANE,
-			0,
-			0, 0, 0
-		};
+		WindowHandle = hWnd;
 
-		WindowDC = GetDC(hWnd);
-		int PixelFormat = ChoosePixelFormat(WindowDC, &PixelFormatDesc);
-		SetPixelFormat(WindowDC, PixelFormat, &PixelFormatDesc);
-
-		HGLRC hGL = wglCreateContext(WindowDC);
-		if (!wglMakeCurrent(WindowDC, hGL))
-			throw new runtime_error("Couldn't assign DC to OpenGL");
-
-		glEnable(GL_DEPTH_TEST);
+		SetupWindow();
 
 		break;
 	}
+	case WM_SIZE: {
+
+		int Width = LOWORD(lParam);
+		int Height = HIWORD(lParam);
+
+		HandleResize(Width, Height);
+
+		break;
+	}
+	case WM_PAINT: {
+		
+		DrawScene();
+
+		break;
+	}
+	// controls
 	case WM_INPUT: {
+
 		UINT RimType;
 		HRAWINPUT RawHandle;
 		RAWINPUT RawInput;
@@ -134,19 +336,6 @@ LRESULT CALLBACK WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 
 		break;
 	}
-	case WM_SIZE: {
-
-		int Width = LOWORD(lParam);
-		int Height = HIWORD(lParam);
-
-		glViewport(0, 0, Width, Height);
-
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		gluPerspective(45.0, (float)Width / Height, 0.001, 100.0);
-		glMatrixMode(GL_MODELVIEW);
-		gluLookAt(0, -5, 0, 0, 0, 0, 0, 0, 1);
-	}
 	case WM_KEYDOWN: {
 
 		int Key = (int)wParam;
@@ -166,53 +355,6 @@ LRESULT CALLBACK WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM 
 
 		int WheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
 		// ...?
-		break;
-	}
-	case WM_PAINT: {
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		glClearColor(0, 0, 0, 1.0f);
-
-		rot[0] += 1.0f;
-		rot[1] = rot[0];
-
-		glPushMatrix();
-		glTranslatef(trans[0], trans[1], trans[2]);
-		glRotatef(rot[0], 0.0f, 0.0f, 1.0f);
-		// glRotatef(rot[0], 0.0f, 1.0f, 0.0f);
-		// glRotatef(rot[1], 0.0f, 0.0f, 1.0f);
-		glBegin(GL_TRIANGLES);	
-		
-#define TOP glIndexi(1); glColor3f(1.0f, 0.0f, 0.0f); glVertex3i( 0,  0,  1)
-#define FR  glIndexi(2); glColor3f(0.0f, 1.0f, 0.0f); glVertex3i( 1,  1, -1)
-#define FL  glIndexi(3); glColor3f(0.0f, 0.0f, 1.0f); glVertex3i(-1,  1, -1)
-#define BR  glIndexi(3); glColor3f(0.0f, 0.0f, 1.0f); glVertex3i( 1, -1, -1)
-#define BL  glIndexi(2); glColor3f(0.0f, 1.0f, 0.0f); glVertex3i(-1, -1, -1)
-		
-		TOP; FL; FR;
-		TOP; FR; BR;
-		TOP; BR; BL;
-		TOP; BL; FL;
-		FR; FL; BL;
-		BL; BR; FR;
-
-		// glm::perspective()
-		
-
-		/*
-		glIndexi(1); 
-		glColor3f(1.0f, 0.0f, 0.0f);
-
-		glVertex3i(-1, 1, -1);
-		*/
-
-		glEnd();
-
-		glPopMatrix();
-
-		glFlush();
-		SwapBuffers(WindowDC);
-
 		break;
 	}
 	case WM_DESTROY:
@@ -258,7 +400,7 @@ void CreateMainWindow(HINSTANCE hInstance) {
 	WindowPos.x = (GetSystemMetrics(SM_CXSCREEN) - Width) / 2;
 	WindowPos.y = (GetSystemMetrics(SM_CYSCREEN) - Height) / 2;
 
-	WindowHandle = CreateWindowW(WindowClass, Title, WS_POPUP, WindowPos.x, WindowPos.y, Width, Height, nullptr, nullptr, hInstance, nullptr);
+	CreateWindowW(WindowClass, Title, WS_POPUP, WindowPos.x, WindowPos.y, Width, Height, nullptr, nullptr, hInstance, nullptr);
 	if (WindowHandle == 0)
 		throw new runtime_error("Couldn't create window");
 
@@ -273,8 +415,6 @@ void CreateMainWindow(HINSTANCE hInstance) {
 
 	if (!RegisterRawInputDevices(Rid, 1, sizeof(Rid[0])))
 		throw new runtime_error("Couldn't register raw devices");
-
-	// glewInit();
 
 	// show the whole thing
 
