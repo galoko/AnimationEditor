@@ -4,6 +4,8 @@
 
 // OpenGL
 
+#define floatsizeofmember(s, m) (sizeof((((s*)0)->m)) / sizeof(GLfloat))
+
 void Form::SetupOpenGL(void) {
 
 	PIXELFORMATDESCRIPTOR PixelFormatDesc =
@@ -44,14 +46,14 @@ void Form::SetupOpenGL(void) {
 
 	// Get a handle for our "MVP" uniform
 	MatrixID = glGetUniformLocation(ShaderID, "MVP");
-	DrawColorID = glGetUniformLocation(ShaderID, "DrawColor");
+	ColorIntencityID = glGetUniformLocation(ShaderID, "ColorIntencity");
 
 	// Projection matrix : 45° Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
 	Projection = perspective(radians(45.0f), 4.0f / 3.0f, 0.1f, 100.0f);
 	// Camera matrix
 	View = lookAt(
-		vec3(0, -5, 0),
-		vec3(0, 0, 0), // and looks at the origin
+		vec3(2.5f, -2.5, 1.264f),
+		vec3(0, 0, 0.264f), // and looks at the origin
 		vec3(0, 0, 1)  // Head is up (set to 0,-1,0 to look upside-down)
 	);
 
@@ -60,73 +62,66 @@ void Form::SetupOpenGL(void) {
 
 	glGenBuffers(1, &BufferName);
 	glBindBuffer(GL_ARRAY_BUFFER, BufferName);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(cube_mesh), cube_mesh, GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cube_mesh), cube_mesh, GL_STATIC_DRAW);
 
 	glClearColor(1, 1, 1, 1);
 
 	// Use our shader
 	glUseProgram(ShaderID);
 
-	Vertex* NullVertex = NULL;
-
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(
-		0,
-		3,
-		GL_FLOAT,
-		GL_FALSE,
-		sizeof(Vertex),
-		(void *)offsetof(Vertex, Position)
-	);
+	glVertexAttribPointer(0, floatsizeofmember(Vertex, Position), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Position));
 
 	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(
-		1,
-		3,
-		GL_FLOAT,
-		GL_FALSE,
-		sizeof(Vertex),
-		(void *)offsetof(Vertex, Normal)
-	);
+	glVertexAttribPointer(1, floatsizeofmember(Vertex, Normal), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Normal));
 
 	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(
-		2,
-		3,
-		GL_FLOAT,
-		GL_FALSE,
-		sizeof(Vertex),
-		(void *)offsetof(Vertex, Color)
-	);
-
-	// glDisableVertexAttribArray(0);
+	glVertexAttribPointer(2, floatsizeofmember(Vertex, Color), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Color));
 }
 
 void Form::DrawScene(void) {
 
-	// Advance scene
-	Angle += radians(60.0f) * StepTime;
-
-	mat4 rotate_z = rotate(mat4(1.0f), Angle, { 0, 0, 1 });
-	mat4 rotate_y = rotate(mat4(1.0f), Angle, { 0, 1, 0 });
-	mat4 rotate_x = rotate(mat4(1.0f), Angle, { 1, 0, 0 });
-	mat4 size = scale(mat4(1.0f), { 1, 2, 1 });
-
-	// Prepare MVP
-	Model = rotate_z * rotate_y * rotate_x * size;
-	MVP = Projection * View * Model;
-	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
-
-	glUniform1i(DrawColorID, GL_TRUE);
-
 	// Clear the screen
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// Draw the triangles !
+	// Angle += (float)(radians(60.0f) * StepTime);
+ 	// Char->Spine->Rotation = rotate(mat4(1.0f), Angle, vec3(0, -1, 0));
+	// Char->Spine->Childs[0]->Childs[0]->Rotation = rotate(mat4(1.0f), -Angle, vec3(0, -1, 0));
+
+	DrawCharacter(Char);
 	glDrawArrays(GL_TRIANGLES, 0, 12 * 3); // 12*3 indices starting at 0 -> 12 triangles
 
 	glFlush();
 	SwapBuffers(WindowDC);
+}
+
+void Form::DrawBone(Bone* Bone, mat4 ParentModel, vec3 ParentSize, uint32 Depth) {
+
+	mat4 SizeMatrix = scale(mat4(1.0f), Bone->Size);
+
+	mat4 MiddleTranslation = translate(mat4(1.0f), Bone->Tail * Bone->Size * 0.5f);
+
+	mat4 OffsetTranslation = translate(mat4(1.0f), Bone->Offset * ParentSize);
+
+	mat4 Model = ParentModel * OffsetTranslation * Bone->Rotation;
+	mat4 FinalMatrix = Projection * View * Model * MiddleTranslation * SizeMatrix;
+
+	// setup matrix
+	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &FinalMatrix[0][0]);
+	glUniform1f(ColorIntencityID, 1.0f - min((float)Depth / 4.0f, 1.0f));
+	// draw cube
+	glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
+
+	for (Form::Bone* Child : Bone->Childs)
+		DrawBone(Child, Model, Bone->Size, Depth + 1);
+}
+
+void Form::DrawCharacter(Character* Char) {
+
+	Bone* Bone = Char->Spine;
+	mat4 ParentModel = translate(mat4(1.0f), Char->Position);
+
+	DrawBone(Bone, ParentModel, {}, 0);
 }
 
 // Integration
@@ -188,6 +183,73 @@ void Form::GenerateCube(Vertex* CubeMesh) {
 
 	GenerateCubeQuad(CubeMesh, { 0,  0, -1 }, { 1, 1, 0 }, id++);
 	CubeMesh += 2 * 3;
+}
+
+// Character generation
+
+Form::Bone* Form::GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, wstring Name)
+{
+	Bone* Result = new Bone();
+
+	// setup linked list
+	Result->Parent = Parent;
+	if (Parent != nullptr)
+		Parent->Childs.push_back(Result);
+
+	vec3 CmToMeters = vec3(0.01f, 0.01f, 0.01f);
+
+	Result->Name = Name;
+	Result->Tail = Tail;
+	Result->Offset = Offset;
+	Result->Size = Size * CmToMeters;
+	Result->Rotation = mat4(1.0f);
+
+	return Result;
+}
+
+void Form::GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 MirrorDirection)
+{
+	vec3 MirrorVector = cross(MirrorDirection, cross(MirrorDirection, vec3(-1.0f))) - MirrorDirection;
+
+	Bone* RightBone = new Bone();
+	RightBone->Name = LeftBone->Name + L" Right";
+
+	RightBone->Offset = LeftBone->Offset * MirrorVector;
+	RightBone->Tail = LeftBone->Tail * MirrorVector;
+	RightBone->Size = LeftBone->Size;
+	RightBone->Rotation = LeftBone->Rotation;
+	RightBone->Parent = RightParent;
+	if (RightParent != nullptr)
+		RightParent->Childs.push_back(RightBone);
+
+	LeftBone->Name = LeftBone->Name + L" Left";
+
+	for (Bone* LeftChild : LeftBone->Childs)
+		GenerateRightSide(LeftChild, RightBone, MirrorDirection);
+}
+
+Form::Character* Form::GenerateCharacter(void)
+{
+	Character* Char = new Character();
+
+	Bone* Spine = GenerateBone(nullptr, { 0, 0, 1.0f }, { 6.5f, 13.0f, 52.8f }, {}, L"Spine");
+
+	Bone* UpperLeg = GenerateBone(Spine, { 0, 0, -1.0f }, { 6.5f, 6.5f, 46.0f }, { 0, 0.5f, 0 }, L"Upper Leg");
+	Bone* LowerLeg = GenerateBone(UpperLeg, { 0, 0, -1.0f }, { 6.49f, 6.49f, 45.0f }, { 0, 0, -1 }, L"Lower Leg");
+	Bone* Foot = GenerateBone(LowerLeg, { 15.5f / 22.0f, 0, 0 }, { 22.0f, 8.0f, 3.0f }, { 0, 0, -1.175f }, L"Foot");
+
+	Bone* UpperArm = GenerateBone(Spine, { 0, 1, 0, }, { 4.5f, 32.0f, 4.5f }, { 0, 0.5f, 1.0f }, L"Upper Arm");
+	Bone* LowerArm = GenerateBone(UpperArm, { 0, 1, 0, }, { 4.49f, 28.0f, 4.49f }, { 0, 1.0f, 0.0f }, L"Lower Arm");
+	Bone* Hand = GenerateBone(LowerArm, { 0, 1, 0, }, { 3.5f, 15.0f, 1.5f }, { 0, 1.0f, 0.0f }, L"Hand");
+
+	Bone* Head = GenerateBone(Spine, { 0, 0, 1, }, { 15.0f, 15.0f, 20.0f }, { 0, 0.0f, 57.8f / 52.8f }, L"Head");
+
+	GenerateRightSide(UpperLeg, UpperLeg->Parent, { 0, 1, 0 });
+	GenerateRightSide(UpperArm, UpperArm->Parent, { 0, 1, 0 });
+
+	Char->Spine = Spine;
+
+	return Char;
 }
 
 // Controls
@@ -255,6 +317,8 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 		WindowHandle = hWnd;
 
 		SetupOpenGL();
+
+		Char = GenerateCharacter();
 
 		break;
 	}

@@ -27,18 +27,43 @@ typedef class Form {
 private:
 	Form(void) { };
 
-	HWND WindowHandle;
-	HDC WindowDC;
-	BOOL IsInFocus;
-
-	GLuint ShaderID, MatrixID, DrawColorID;
-	mat4 MVP;
-	GLuint BufferName;
-
+	// Integration
 	double StepTime;
-	float Angle;
 
-	mat4 Projection, View, Model;
+	// Character generation
+
+	typedef class Bone {
+
+	public:
+		wstring Name;
+
+		vec3 Offset, Tail, Size;
+
+		mat4 Rotation;
+
+		Bone* Parent;
+		vector<Bone*> Childs;
+
+	} Bone;
+
+	typedef class Character {
+
+	public:
+		vec3 Position;
+
+		Bone* Spine; // also known as Root
+
+	} Character;
+
+	float Angle;
+	Character* Char;
+
+	// Size is in cm, Offset and Direction must be normalized
+	Bone* GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, wstring Name);
+	void GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 MirrorDirection);
+	Character* GenerateCharacter(void);
+
+	// OpenGL
 
 	typedef struct Vertex {
 
@@ -46,38 +71,28 @@ private:
 
 	} Vertex;
 
-	// OpenGL
+	GLuint ShaderID, MatrixID, ColorIntencityID;
+	mat4 Projection, View;
+	GLuint BufferName;
+
 	void SetupOpenGL(void);
 	void DrawScene(void);
+	void DrawBone(Bone* Bone, mat4 ParentModel, vec3 ParentSize, uint32 Depth);
+	void DrawCharacter(Character* Char);
 
 	// Model generation
 	static void GenerateCubeQuad(Vertex* QuadMesh, vec3 normal, vec3 color, uint32 id);
 	static void GenerateCube(Vertex* CubeMesh);
 
-	typedef class Bone {
-
-		uint32 StartId; // this id..id+5 are ids of this bone quads
-
-		vec3 Offset, Size;
-
-		vector<Bone*> Childs;
-
-	} Bone;
-
-	typedef class Character {
-
-		vec3 Position;
-
-		Bone* Pelvis; // also known as Root
-
-	} Character;
-
-	// TODO character generation
-
 	// Controls
 	void ProcessMouseInput(LONG dx, LONG dy);
 
 	// Window handling
+
+	HWND WindowHandle;
+	HDC WindowDC;
+	BOOL IsInFocus;
+
 	static LRESULT CALLBACK WndProcStaticCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	LRESULT WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 public:
