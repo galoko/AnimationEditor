@@ -3,13 +3,15 @@
 Character::Character(void)
 {
 	GenerateBones();
+	UpdateWorldTranforms();
+	UpdateFloorZ();
 }
 
 Bone* Character::GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, wstring Name)
 {
 	float CmToMeters = 0.01f;
 
-	Bone* Result = new Bone(Parent, Tail, Size * CmToMeters, Offset, Name, NextBoneID++);
+	Bone* Result = new Bone(NextBoneID++, Name, Offset, Tail, Size * CmToMeters, Parent);
 
 	Bones.push_back(Result);
 
@@ -52,44 +54,56 @@ void Character::GenerateBones(void)
 	GenerateRightSide(UpperArm, UpperArm->Parent, { 0, 1, 0 });
 }
 
-float Character::GetLowestZResursive(Bone* Current, float CurrentZ, float ParentHeight)
+void Character::UpdateWorldTranforms(void)
 {
-	float HeadZ = CurrentZ + Current->Offset.z * ParentHeight;
-	float MiddleZ = HeadZ + Current->Tail.z * Current->Size.z * 0.5f;
-	float TailZ = MiddleZ - Current->Size.z * 0.5f;
+	mat4 ParentModel = translate(mat4(1.0f), this->Position);
 
-	CurrentZ = min(CurrentZ, HeadZ);
-	CurrentZ = min(CurrentZ, MiddleZ);
-	CurrentZ = min(CurrentZ, TailZ);
-
-	for (Bone* Child : Current->Childs)
-		CurrentZ = min(CurrentZ, GetLowestZResursive(Child, HeadZ, Current->Size.z));
-
-	return CurrentZ;
+	Spine->UpdateWorldTransform(ParentModel, {});
 }
 
-float Character::GetFloorZ(void)
+void Character::UpdateFloorZ(void)
 {
-	return GetLowestZResursive(this->Spine, 0.0f, 0.0f);
-}
+	FloorZ = 0;
 
-void Character::UpdateWorldTranform(void)
-{
+	for (Bone* Bone : this->Bones) {
 
+		mat4 MiddleTransform = Bone->WorldTransform * Bone->MiddleTranslation;
+
+		float Z = MiddleTransform[3].z - Bone->Size.z * 0.5f;
+
+		FloorZ = min(FloorZ, Z);
+	}
 }
 
 // Bone
 
-Bone::Bone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, wstring Name, uint32 ID)
+Bone::Bone(uint32 ID, wstring Name, vec3 Offset, vec3 Tail, vec3 Size, Bone* Parent)
 {
+	this->ID = ID;
+	this->Name = Name;
+
+	this->Offset = Offset;
+	this->Tail = Tail;
+	this->Size = Size;
+
+	this->Rotation = mat4(1.0f);
+	this->MiddleTranslation = translate(mat4(1.0f), this->Tail * this->Size * 0.5f);
+
 	this->Parent = Parent;
-	if (Parent != nullptr)
+	if (Parent != nullptr) {
 		Parent->Childs.push_back(this);
 
-	this->Name = Name;
-	this->ID = ID;
-	this->Tail = Tail;
-	this->Offset = Offset;
-	this->Size = Size;
-	this->Rotation = mat4(1.0f);
+		this->Depth = Parent->Depth + 1;
+	}
+	else
+		this->Depth = 0;
+}
+
+void Bone::UpdateWorldTransform(mat4 ParentModel, vec3 ParentSize)
+{
+	mat4 OffsetTranslation = translate(mat4(1.0f), this->Offset * ParentSize);
+	this->WorldTransform = ParentModel * OffsetTranslation * this->Rotation;
+
+	for (Bone* Child : this->Childs)
+		Child->UpdateWorldTransform(this->WorldTransform, this->Size);
 }

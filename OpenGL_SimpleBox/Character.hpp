@@ -3,8 +3,10 @@
 #include <string>
 #include <vector>
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 
 #include <btBulletDynamicsCommon.h>
 
@@ -22,18 +24,20 @@ public:
 	Bone* Parent;
 	vector<Bone*> Childs;
 
-	mat4 Rotation, WorldTransform;
+	mat4 Rotation, WorldTransform, MiddleTranslation;
+
+	uint32 Depth;
 
 	btRigidBody* PhysicBody;
 
-	Bone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, wstring Name, uint32 ID);
+	Bone(uint32 ID, wstring Name, vec3 Offset, vec3 Tail, vec3 Size, Bone* Parent);
+
+	void UpdateWorldTransform(mat4 ParentModel, vec3 ParentSize);
 } Bone;
 
 typedef class Character {
 private:
 	uint32 NextBoneID;
-
-	float GetLowestZResursive(Bone* Bone, float CurrentZ, float ParentHeight);
 
 	Bone* GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, wstring Name);
 	void GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 MirrorDirection);
@@ -45,9 +49,11 @@ public:
 
 	vector<Bone*> Bones; // list for easy iterating
 
+	float FloorZ;
+
 	Character(void);
 
-	float GetFloorZ(void);
+	void UpdateWorldTranforms(void);
 
-	void UpdateWorldTranform(void);
+	void UpdateFloorZ(void);
 } Character;

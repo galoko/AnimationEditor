@@ -94,33 +94,21 @@ void Form::DrawScene(void) {
 	SwapBuffers(WindowDC);
 }
 
-void Form::DrawBone(Bone* Current, mat4 ParentModel, vec3 ParentSize, uint32 Depth) {
-
-	mat4 SizeMatrix = scale(mat4(1.0f), Current->Size);
-
-	mat4 MiddleTranslation = translate(mat4(1.0f), Current->Tail * Current->Size * 0.5f);
-
-	mat4 OffsetTranslation = translate(mat4(1.0f), Current->Offset * ParentSize);
-
-	mat4 Model = ParentModel * OffsetTranslation * Current->Rotation;
-	mat4 FinalMatrix = Projection * View * Model * MiddleTranslation * SizeMatrix;
-
-	// setup matrix
-	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &FinalMatrix[0][0]);
-	glUniform1f(ColorIntencityID, 1.0f - min((float)Depth / 4.0f, 1.0f));
-	// draw cube
-	glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
-
-	for (Bone* Child : Current->Childs)
-		DrawBone(Child, Model, Current->Size, Depth + 1);
-}
-
 void Form::DrawCharacter(Character* Char) {
 
-	Bone* Bone = Char->Spine;
-	mat4 ParentModel = translate(mat4(1.0f), Char->Position);
+	for (Bone* Bone : Char->Bones) {
 
-	DrawBone(Bone, ParentModel, {}, 0);
+		mat4 SizeMatrix = scale(mat4(1.0f), Bone->Size);
+		mat4 Model = Bone->WorldTransform * Bone->MiddleTranslation;
+
+		mat4 FinalMatrix = Projection * View * Model * SizeMatrix;
+
+		// setup matrix
+		glUniformMatrix4fv(MatrixID, 1, GL_FALSE, value_ptr(FinalMatrix));
+		glUniform1f(ColorIntencityID, 1.0f - min((float)Bone->Depth / 4.0f, 1.0f));
+		// draw cube
+		glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
+	}
 }
 
 void Form::DrawFloor(void)
@@ -131,7 +119,7 @@ void Form::DrawFloor(void)
 	mat4 FinalMatrix = Projection * View * Translation * SizeMatrix;
 
 	// setup matrix
-	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &FinalMatrix[0][0]);
+	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, value_ptr(FinalMatrix));
 	glUniform1f(ColorIntencityID, 0.1f);
 	// draw cube
 	glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
@@ -139,7 +127,81 @@ void Form::DrawFloor(void)
 
 // Integration
 
+mat4 BulletToGLM(btTransform t) {
+
+	btScalar matrix[16];
+
+	t.getOpenGLMatrix(matrix);
+
+	return mat4(
+		matrix[0], matrix[1], matrix[2], matrix[3],
+		matrix[4], matrix[5], matrix[6], matrix[7],
+		matrix[8], matrix[9], matrix[10], matrix[11],
+		matrix[12], matrix[13], matrix[14], matrix[15]);
+}
+
+btTransform GLMToBullet(mat4 m) {
+
+	btScalar matrix[16];
+
+	matrix[ 0] = m[0][0];
+	matrix[ 1] = m[0][1];
+	matrix[ 2] = m[0][2];
+	matrix[ 3] = m[0][3];
+	matrix[ 4] = m[1][0];
+	matrix[ 5] = m[1][1];
+	matrix[ 6] = m[1][2];
+	matrix[ 7] = m[1][3];
+	matrix[ 8] = m[2][0];
+	matrix[ 9] = m[2][1];
+	matrix[10] = m[2][2];
+	matrix[11] = m[2][3];
+	matrix[12] = m[3][0];
+	matrix[13] = m[3][1];
+	matrix[14] = m[3][2];
+	matrix[15] = m[3][3];
+
+	btTransform Result;
+	Result.setFromOpenGLMatrix(matrix);
+
+	return Result;
+}
+
+btVector3 GLMToBullet(vec3 v) {
+
+	return btVector3(v.x, v.y, v.z);
+}
+
+static int Started;
+
 void Form::Tick(double dt) {
+
+	PhysicsTime += dt;
+	if (Started || PhysicsTime >= 1.0) {
+		
+		if (!Started) {
+			Started = true;
+			PhysicsTime = 0.0;
+		}
+
+		uint64 StepCount = (uint64)(PhysicsTime * PHYSICS_FPS);
+		for (; DoneStepCount < StepCount; DoneStepCount++) {
+
+			double dt = 1.0 / (double)PHYSICS_FPS;
+
+			// Char->Spine->PhysicBody->applyForce(btVector3(0, 0, 90000 * dt), btVector3(0, 0, 0));
+
+			World->stepSimulation(dt, 0, dt);
+		}
+	}
+	
+	for (Bone* Bone : Char->Bones) {
+
+		btTransform BulletTransfrom;
+		Bone->PhysicBody->getMotionState()->getWorldTransform(BulletTransfrom);
+		
+		Bone->WorldTransform = BulletToGLM(BulletTransfrom) * inverse(Bone->MiddleTranslation);
+	}
 
 	StepTime = dt;
 	RedrawWindow(WindowHandle, NULL, 0, RDW_INVALIDATE | RDW_UPDATENOW);
@@ -208,6 +270,24 @@ void Form::CreateFloor(float FloorSize2D, float FloorHeight, float FloorZ)
 
 // Physics
 
+struct YourOwnFilterCallback : public btOverlapFilterCallback
+{
+	// return true when pairs need collision
+	virtual bool needBroadphaseCollision(btBroadphaseProxy* proxy0, btBroadphaseProxy* proxy1) const
+	{
+		btRigidBody* body0 = static_cast<btRigidBody*>(proxy0->m_clientObject);
+		btRigidBody* body1 = static_cast<btRigidBody*>(proxy1->m_clientObject);
+
+		Bone* Bone0 = (Bone*)body0->getUserPointer();
+		Bone* Bone1 = (Bone*)body1->getUserPointer();
+
+		if (Bone0 == nullptr || Bone1 == nullptr)
+			return true;
+
+		return true;
+	}
+};
+
 void Form::SetupBulletWorld(void)
 {
 	btBroadphaseInterface* broadphase = new btDbvtBroadphase();
@@ -220,20 +300,56 @@ void Form::SetupBulletWorld(void)
 	World = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
 	World->setGravity(btVector3(0, 0, -9.8));
 
-	// creating physical bodies
-	btRigidBody* Floor = AddStaticBox(FloorPosition, FloorSize);
+	btOverlapFilterCallback* filterCallback = new YourOwnFilterCallback();
+	World->getPairCache()->setOverlapFilterCallback(filterCallback);
 
-	btRigidBody* Spine = AddDynamicBox(Char->Position, Char->Spine->Size, 1.0f);
+	btContactSolverInfo& Solver = World->getSolverInfo();
+	Solver.m_solverMode = SOLVER_SIMD;
+	Solver.m_numIterations = 20;
+
+	// creating physical bodies
+	btRigidBody* Floor = AddStaticBox(translate(mat4(1.0f), FloorPosition), FloorSize);
+
+	for (Bone* Bone : Char->Bones) {
+
+		float Volume = Bone->Size.x * Bone->Size.y * Bone->Size.z;
+		float Density = 1900;
+		float Mass = Density * Volume;
+
+		mat4 Transform = Bone->WorldTransform * Bone->MiddleTranslation;
+
+		Bone->PhysicBody = AddDynamicBox(Transform, Bone->Size, Mass);
+		Bone->PhysicBody->setUserPointer((void*)Bone);
+	}
+
+	for (Bone* Parent : Char->Bones) 
+		for (Bone* Child : Parent->Childs) {
+
+			vec4 Zero = vec4(0, 0, 0, 1);
+
+			vec3 ChildHead = Child->WorldTransform * Zero;
+			vec3 ChildPosition = Child->WorldTransform * Child->MiddleTranslation * Zero;
+			vec3 ParentPosition = Parent->WorldTransform * Parent->MiddleTranslation * Zero;
+
+			vec3 ChildLocalPoint = ChildHead - ChildPosition;
+			vec3 ParentLocalPoint = ChildHead - ParentPosition;
+
+			btVector3 BulletChildLocalPoint = GLMToBullet(ChildLocalPoint);
+			btVector3 BulletParentLocalPoint = GLMToBullet(ParentLocalPoint);
+			
+			btPoint2PointConstraint* Constraint = 
+				new btPoint2PointConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint);
+		
+			World->addConstraint(Constraint);
+		}
 }
 
-btRigidBody * Form::AddDynamicBox(vec3 Position, vec3 Size, float Mass)
+btRigidBody* Form::AddDynamicBox(mat4 Transform, vec3 Size, float Mass)
 {
 	Size *= 0.5f;
 	btCollisionShape* Shape = new btBoxShape(btVector3(Size.x, Size.y, Size.z));
 
-	btTransform Transform;
-	Transform.setIdentity();
-	Transform.setOrigin(btVector3(Position.x, Position.y, Position.z));
+	btTransform BulletTransform = GLMToBullet(Transform);
 
 	bool IsDynamic = (Mass > 0);
 
@@ -241,18 +357,24 @@ btRigidBody * Form::AddDynamicBox(vec3 Position, vec3 Size, float Mass)
 	if (IsDynamic)
 		Shape->calculateLocalInertia(Mass, LocalInertia);
 
-	btDefaultMotionState* MotionState = new btDefaultMotionState(Transform);
+	btDefaultMotionState* MotionState = new btDefaultMotionState(BulletTransform);
 	btRigidBody::btRigidBodyConstructionInfo BodyDef(Mass, MotionState, Shape, LocalInertia);
 	btRigidBody* Body = new btRigidBody(BodyDef);
+
+	float MinSize = min(min(Size.x, Size.y), Size.z);
+	float MaxSize = max(max(Size.x, Size.y), Size.z);
+	Body->setCcdMotionThreshold(MinSize * 0.1);
+	Body->setCcdSweptSphereRadius(MinSize * 0.1f);
+	Body->setFriction(1.0);
 
 	World->addRigidBody(Body);
 
 	return Body;
 }
 
-btRigidBody* Form::AddStaticBox(vec3 Position, vec3 Size)
+btRigidBody* Form::AddStaticBox(mat4 Transform, vec3 Size)
 {
-	return AddDynamicBox(Position, Size, 0.0f);
+	return AddDynamicBox(Transform, Size, 0.0f);
 }
 
 // Controls
@@ -323,7 +445,7 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 
 		Char = new Character();
 
-		CreateFloor(2.0f, 0.001f, Char->GetFloorZ());
+		CreateFloor(4.0f, 100.0f, Char->FloorZ);
 
 		SetupBulletWorld();
 

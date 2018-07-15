@@ -14,8 +14,11 @@
 #include <GL/gl.h>			
 #include <GL/glu.h>	
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 #include <btBulletDynamicsCommon.h>
 
@@ -27,12 +30,15 @@
 using namespace std;
 using namespace glm;
 
+#define PHYSICS_FPS 240
+
 typedef class Form {
 private:
 	Form(void);
 
 	// Integration
-	double StepTime;
+	double StepTime, PhysicsTime;
+	uint64 DoneStepCount;
 
 	// Character
 
@@ -57,7 +63,6 @@ private:
 
 	void SetupOpenGL(void);
 	void DrawScene(void);
-	void DrawBone(Bone* Bone, mat4 ParentModel, vec3 ParentSize, uint32 Depth);
 	void DrawCharacter(Character* Char);
 	void DrawFloor(void);
 
@@ -69,8 +74,8 @@ private:
 	btDiscreteDynamicsWorld* World;
 
 	void SetupBulletWorld(void);
-	btRigidBody* AddDynamicBox(vec3 Position, vec3 Size, float Mass);
-	btRigidBody* AddStaticBox(vec3 Position, vec3 Size);
+	btRigidBody* AddDynamicBox(mat4 Transform, vec3 Size, float Mass);
+	btRigidBody* AddStaticBox(mat4 Transform, vec3 Size);
 
 	// Controls
 	void ProcessMouseInput(LONG dx, LONG dy);
