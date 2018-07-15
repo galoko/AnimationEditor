@@ -19,12 +19,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Character.cpp" />
     <ClCompile Include="Form.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="shader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Form.hpp" />
+    <ClInclude Include="Header.h" />
     <ClInclude Include="shader.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

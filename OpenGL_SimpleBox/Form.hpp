@@ -14,21 +14,18 @@
 #include <GL/gl.h>			
 #include <GL/glu.h>	
 
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/matrix_decompose.hpp>
-#include <glm/gtx/quaternion.hpp>
 
 #include <btBulletDynamicsCommon.h>
+
+#include "Character.hpp"
 
 #pragma comment (lib, "opengl32.lib")
 #pragma comment (lib, "glu32.lib")
 
 using namespace std;
 using namespace glm;
-
-#define MAX_BONES 20
 
 typedef class Form {
 private:
@@ -37,45 +34,13 @@ private:
 	// Integration
 	double StepTime;
 
-	// Character generation
+	// Character
 
-	typedef class Bone {
-
-	public:
-		wstring Name;
-		uint32 ID;
-
-		vec3 Offset, Tail, Size;
-
-		Bone* Parent;
-		vector<Bone*> Childs;
-
-	} Bone;
-
-	typedef class Character {
-
-	public:
-		vec3 Position;
-
-		Bone* Spine; // also known as Root
-
-		mat4 State[MAX_BONES];
-
-	} Character;
-
-	uint32 NextBoneID;
-
-	float Angle;
 	Character* Char;
+
+	// Floor
 	
 	vec3 FloorPosition, FloorSize;
-
-	// Size is in cm, Offset and Direction must be normalized
-	Bone* GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, wstring Name);
-	void GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 MirrorDirection);
-	Character* GenerateCharacter(void);
-	float GetLowestZResursive(Bone* Bone, float CurrentZ, float ParentHeight);
-	float GetFloorZForCharacter(Character* Char);
 	void CreateFloor(float FloorSize2D, float FloorHeight, float FloorZ);
 
 	// OpenGL

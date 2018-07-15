@@ -94,15 +94,15 @@ void Form::DrawScene(void) {
 	SwapBuffers(WindowDC);
 }
 
-void Form::DrawBone(Bone* Bone, mat4 ParentModel, vec3 ParentSize, uint32 Depth) {
+void Form::DrawBone(Bone* Current, mat4 ParentModel, vec3 ParentSize, uint32 Depth) {
 
-	mat4 SizeMatrix = scale(mat4(1.0f), Bone->Size);
+	mat4 SizeMatrix = scale(mat4(1.0f), Current->Size);
 
-	mat4 MiddleTranslation = translate(mat4(1.0f), Bone->Tail * Bone->Size * 0.5f);
+	mat4 MiddleTranslation = translate(mat4(1.0f), Current->Tail * Current->Size * 0.5f);
 
-	mat4 OffsetTranslation = translate(mat4(1.0f), Bone->Offset * ParentSize);
+	mat4 OffsetTranslation = translate(mat4(1.0f), Current->Offset * ParentSize);
 
-	mat4 Model = ParentModel * OffsetTranslation * Char->State[Bone->ID];
+	mat4 Model = ParentModel * OffsetTranslation * Current->Rotation;
 	mat4 FinalMatrix = Projection * View * Model * MiddleTranslation * SizeMatrix;
 
 	// setup matrix
@@ -111,8 +111,8 @@ void Form::DrawBone(Bone* Bone, mat4 ParentModel, vec3 ParentSize, uint32 Depth)
 	// draw cube
 	glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
 
-	for (Form::Bone* Child : Bone->Childs)
-		DrawBone(Child, Model, Bone->Size, Depth + 1);
+	for (Bone* Child : Current->Childs)
+		DrawBone(Child, Model, Current->Size, Depth + 1);
 }
 
 void Form::DrawCharacter(Character* Char) {
@@ -198,96 +198,7 @@ void Form::GenerateCube(Vertex* CubeMesh) {
 	CubeMesh += 2 * 3;
 }
 
-// Character generation
-
-Form::Bone* Form::GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, wstring Name)
-{
-	Bone* Result = new Bone();
-
-	// setup linked list
-	Result->Parent = Parent;
-	if (Parent != nullptr)
-		Parent->Childs.push_back(Result);
-
-	vec3 CmToMeters = vec3(0.01f, 0.01f, 0.01f);
-
-	Result->Name = Name;
-	Result->ID = NextBoneID++;
-	Result->Tail = Tail;
-	Result->Offset = Offset;
-	Result->Size = Size * CmToMeters;
-
-	return Result;
-}
-
-void Form::GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 MirrorDirection)
-{
-	vec3 MirrorVector = cross(MirrorDirection, cross(MirrorDirection, vec3(-1.0f))) - MirrorDirection;
-
-	Bone* RightBone = new Bone();
-	RightBone->Name = LeftBone->Name + L" Right";
-	RightBone->ID = NextBoneID++;
-	RightBone->Offset = LeftBone->Offset * MirrorVector;
-	RightBone->Tail = LeftBone->Tail * MirrorVector;
-	RightBone->Size = LeftBone->Size;
-	RightBone->Parent = RightParent;
-	if (RightParent != nullptr)
-		RightParent->Childs.push_back(RightBone);
-
-	LeftBone->Name = LeftBone->Name + L" Left";
-
-	for (Bone* LeftChild : LeftBone->Childs)
-		GenerateRightSide(LeftChild, RightBone, MirrorDirection);
-}
-
-Form::Character* Form::GenerateCharacter(void)
-{
-	Character* Char = new Character();
-
-	Bone* Spine = GenerateBone(nullptr, { 0, 0, 1.0f }, { 6.5f, 13.0f, 52.8f }, {}, L"Spine");
-
-	Bone* Head = GenerateBone(Spine, { 0, 0, 1, }, { 15.0f, 15.0f, 20.0f }, { 0, 0.0f, 57.8f / 52.8f }, L"Head");
-
-	Bone* UpperLeg = GenerateBone(Spine, { 0, 0, -1.0f }, { 6.5f, 6.5f, 46.0f }, { 0, 0.5f, 0 }, L"Upper Leg");
-	Bone* LowerLeg = GenerateBone(UpperLeg, { 0, 0, -1.0f }, { 6.49f, 6.49f, 45.0f }, { 0, 0, -1 }, L"Lower Leg");
-	Bone* Foot = GenerateBone(LowerLeg, { 15.5f / 22.0f, 0, 0 }, { 22.0f, 8.0f, 3.0f }, { 0, 0, -1.175f }, L"Foot");
-	
-	GenerateRightSide(UpperLeg, UpperLeg->Parent, { 0, 1, 0 });
-
-	Bone* UpperArm = GenerateBone(Spine, { 0, 1, 0, }, { 4.5f, 32.0f, 4.5f }, { 0, 0.5f, 1.0f }, L"Upper Arm");
-	Bone* LowerArm = GenerateBone(UpperArm, { 0, 1, 0, }, { 4.49f, 28.0f, 4.49f }, { 0, 1.0f, 0.0f }, L"Lower Arm");
-	Bone* Hand = GenerateBone(LowerArm, { 0, 1, 0, }, { 3.5f, 15.0f, 1.5f }, { 0, 1.0f, 0.0f }, L"Hand");
-
-	GenerateRightSide(UpperArm, UpperArm->Parent, { 0, 1, 0 });
-
-	Char->Spine = Spine;
-
-	for (int Index = 0; Index < MAX_BONES; Index++)
-		Char->State[Index] = mat4(1.0f);
-
-	return Char;
-}
-
-float Form::GetLowestZResursive(Bone* Bone, float CurrentZ, float ParentHeight)
-{
-	float HeadZ = CurrentZ + Bone->Offset.z * ParentHeight;
-	float MiddleZ = HeadZ + Bone->Tail.z * Bone->Size.z * 0.5f;
-	float TailZ = MiddleZ - Bone->Size.z * 0.5f;
-
-	CurrentZ = min(CurrentZ, HeadZ);
-	CurrentZ = min(CurrentZ, MiddleZ);
-	CurrentZ = min(CurrentZ, TailZ);
-
-	for (Form::Bone* Child : Bone->Childs)
-		CurrentZ = min(CurrentZ, GetLowestZResursive(Child, HeadZ, Bone->Size.z));
-
-	return CurrentZ;
-}
-
-float Form::GetFloorZForCharacter(Character* Char)
-{
-	return GetLowestZResursive(Char->Spine, 0.0f, 0.0f);
-}
+// Floor
 
 void Form::CreateFloor(float FloorSize2D, float FloorHeight, float FloorZ)
 {
@@ -410,9 +321,9 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 
 		SetupOpenGL();
 
-		Char = GenerateCharacter();
+		Char = new Character();
 
-		CreateFloor(2.0f, 0.001f, GetFloorZForCharacter(Char));
+		CreateFloor(2.0f, 0.001f, Char->GetFloorZ());
 
 		SetupBulletWorld();
 
