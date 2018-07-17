@@ -6,6 +6,8 @@
 
 #define floatsizeofmember(s, m) (sizeof((((s*)0)->m)) / sizeof(GLfloat))
 
+#define SOLID_ID ((void*)1)
+
 Form::Form(void){ 
 }
 
@@ -57,7 +59,7 @@ void Form::SetupOpenGL(void) {
 	View = lookAt(
 		vec3(2.5f, -2.5, 1.264f),
 		vec3(0, 0, 0.264f), // and looks at the origin
-		vec3(0, 0, 1)  // Head is up (set to 0,-1,0 to look upside-down)
+		vec3(0, 0, 1)  // Bone is up (set to 0,-1,0 to look upside-down)
 	);
 
 	Vertex cube_mesh[6 * 2 * 3];
@@ -88,7 +90,8 @@ void Form::DrawScene(void) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	DrawCharacter(Char);
-	DrawFloor();
+	if (FloorSize.length() > 0)
+		DrawFloor();
 
 	glFlush();
 	SwapBuffers(WindowDC);
@@ -105,7 +108,7 @@ void Form::DrawCharacter(Character* Char) {
 
 		// setup matrix
 		glUniformMatrix4fv(MatrixID, 1, GL_FALSE, value_ptr(FinalMatrix));
-		glUniform1f(ColorIntencityID, 1.0f - min((float)Bone->Depth / 4.0f, 1.0f));
+		glUniform1f(ColorIntencityID, 1.0f - min((float)Bone->Depth / 6.0f, 1.0f));
 		// draw cube
 		glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
 	}
@@ -138,6 +141,11 @@ mat4 BulletToGLM(btTransform t) {
 		matrix[4], matrix[5], matrix[6], matrix[7],
 		matrix[8], matrix[9], matrix[10], matrix[11],
 		matrix[12], matrix[13], matrix[14], matrix[15]);
+}
+
+vec3 BulletToGLM(btVector3 v) {
+
+	return vec3(v.getX(), v.getY(), v.getZ());
 }
 
 btTransform GLMToBullet(mat4 m) {
@@ -189,7 +197,33 @@ void Form::Tick(double dt) {
 
 			double dt = 1.0 / (double)PHYSICS_FPS;
 
-			// Char->Spine->PhysicBody->applyForce(btVector3(0, 0, 90000 * dt), btVector3(0, 0, 0));
+			Bone* Bone = Char->FindBone(L"Head");
+
+			vec3 Position = Bone->WorldTransform * Bone->MiddleTranslation * vec4(0, 0, 0, 1);
+			vec3 Velocity = BulletToGLM(Bone->PhysicBody->getLinearVelocity());
+			vec3 DestPosition = Bone->InitialPosition;
+			DestPosition.z += 0.5;
+			vec3 Force = (DestPosition - Position) * 3000.0f - Velocity * 1000.0f;
+
+			btScalar AngleX, AngleY, AngleZ;
+			Bone->PhysicBody->getWorldTransform().getRotation().getEulerZYX(AngleZ, AngleY, AngleX);
+			vec3 AngularVelocity = BulletToGLM(Bone->PhysicBody->getAngularVelocity());
+			vec3 Torque = -vec3(AngleX, AngleY, AngleZ) * 30.0f - AngularVelocity * 1.0f;
+
+			const float interval = 3;
+			// PD control		
+			if (fmod(PhysicsTime, interval * 2) <= interval) {
+				Bone->PhysicBody->applyCentralForce(GLMToBullet(Force));
+				Bone->PhysicBody->applyTorque(GLMToBullet(Torque));
+			}
+
+			// Char->Pelvis->Childs[0]->PhysicBody->applyForce(btVector3(0, 0, 0), btVector3(0, 0, 0));
+			// Char->Pelvis->Childs[0]->PhysicBody->applyTorque(btVector3(0, 0, 100));
+			// Char->FindBone(L"Lower Arm Left")->PhysicBody->applyTorque(btVector3(0, 0, -1));
+			// Char->FindBone(L"Lower Arm Right")->PhysicBody->applyTorque(btVector3(0, 0, 1));
+			// Char->FindBone(L"Pelvis")->PhysicBody->applyTorque(btVector3(0, -90, 0));
+			// Char->FindBone(L"Neck")->PhysicBody->applyTorque(btVector3(0, 0.1, 0));
+			// Char->FindBone(L"Upper Leg Left")->PhysicBody->applyTorque(btVector3(0, -40.5, 0.0));
 
 			World->stepSimulation(dt, 0, dt);
 		}
@@ -275,18 +309,35 @@ struct YourOwnFilterCallback : public btOverlapFilterCallback
 	// return true when pairs need collision
 	virtual bool needBroadphaseCollision(btBroadphaseProxy* proxy0, btBroadphaseProxy* proxy1) const
 	{
-		btRigidBody* body0 = static_cast<btRigidBody*>(proxy0->m_clientObject);
-		btRigidBody* body1 = static_cast<btRigidBody*>(proxy1->m_clientObject);
+		btCollisionObject* obj0 = static_cast<btCollisionObject*>(proxy0->m_clientObject);
+		btCollisionObject* obj1 = static_cast<btCollisionObject*>(proxy1->m_clientObject);
 
-		Bone* Bone0 = (Bone*)body0->getUserPointer();
-		Bone* Bone1 = (Bone*)body1->getUserPointer();
+		Bone* Bone0 = (Bone*)obj0->getUserPointer();
+		Bone* Bone1 = (Bone*)obj1->getUserPointer();
 
+		// some wierd shit
 		if (Bone0 == nullptr || Bone1 == nullptr)
+			return false;
+
+		// either one is solid
+		if (Bone0 == SOLID_ID || Bone1 == SOLID_ID)
 			return true;
 
+		// if we have parent->child collision - filter it out
+		if (Bone0->Parent == Bone1 || Bone1->Parent == Bone0)
+			return false;
+
+		// non parent bones = collision
 		return true;
 	}
 };
+
+void Switch(float* a, float* b) {
+
+	float temp = *a;
+	*a = *b;
+	*b = temp;
+}
 
 void Form::SetupBulletWorld(void)
 {
@@ -304,17 +355,23 @@ void Form::SetupBulletWorld(void)
 	World->getPairCache()->setOverlapFilterCallback(filterCallback);
 
 	btContactSolverInfo& Solver = World->getSolverInfo();
-	Solver.m_solverMode = SOLVER_SIMD;
-	Solver.m_numIterations = 20;
+	// Solver.m_solverMode = SOLVER_SIMD;
+	Solver.m_numIterations = 30;
 
 	// creating physical bodies
-	btRigidBody* Floor = AddStaticBox(translate(mat4(1.0f), FloorPosition), FloorSize);
+	if (FloorSize.length() > 0) {
+		btRigidBody* Floor = AddStaticBox(translate(mat4(1.0f), FloorPosition), FloorSize);
+		Floor->setUserPointer(SOLID_ID);
+	}
 
 	for (Bone* Bone : Char->Bones) {
 
 		float Volume = Bone->Size.x * Bone->Size.y * Bone->Size.z;
 		float Density = 1900;
 		float Mass = Density * Volume;
+
+		if (Bone->IsLocked)
+			Mass = 0.0f;
 
 		mat4 Transform = Bone->WorldTransform * Bone->MiddleTranslation;
 
@@ -336,11 +393,109 @@ void Form::SetupBulletWorld(void)
 
 			btVector3 BulletChildLocalPoint = GLMToBullet(ChildLocalPoint);
 			btVector3 BulletParentLocalPoint = GLMToBullet(ParentLocalPoint);
+
+			btTransform BulletChildFrame;
+			BulletChildFrame.setIdentity();
+			BulletChildFrame.setOrigin(BulletChildLocalPoint);
+			// BulletChildFrame.getBasis().setEulerZYX(M_PI / 2, 0, 0);
+
+			btTransform BulletParentFrame;
+			BulletParentFrame.setIdentity();
+			BulletParentFrame.setOrigin(BulletParentLocalPoint);
+			// BulletParentFrame.getBasis().setEulerZYX(M_PI / 2, 0, 0);
 			
-			btPoint2PointConstraint* Constraint = 
-				new btPoint2PointConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint);
+			Parent->PhysicBody->setActivationState(DISABLE_DEACTIVATION);
+			Child->PhysicBody->setActivationState(DISABLE_DEACTIVATION);
+
+			vec3 LowLimit = Child->LowLimit;
+			vec3 HighLimit = Child->HighLimit;
+
+			if (Child->IsFixed()) {
+
+				btFixedConstraint* Constraint = new btFixedConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
+				World->addConstraint(Constraint, true);
+			}
+			else
+			if (Child->IsOnlyXRotation())
+			{
+				btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
+					btVector3(1, 0, 0), btVector3(1, 0, 0));
+				Constraint->setLimit(LowLimit.x, HighLimit.x);
+				World->addConstraint(Constraint, true);
+			}
+			else
+			if (Child->IsOnlyYRotation())
+			{
+				btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
+					btVector3(0, 1, 0), btVector3(0, 1, 0));
+				Constraint->setLimit(LowLimit.y, HighLimit.y);
+				World->addConstraint(Constraint, true);
+			}
+			else
+			if (Child->IsOnlyZRotation())
+			{
+				btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
+					btVector3(0, 0, 1), btVector3(0, 0, 1));
+				Constraint->setLimit(LowLimit.z, HighLimit.z);
+				World->addConstraint(Constraint, true);
+			}
+			else
+			// generic 6DOF 
+			{
+				if (LowLimit.y < radians(-80.0f) || HighLimit.y > radians(80.0f)) {
+					// unstable gimbal lock fix
+
+					if (LowLimit.x < radians(-80.0f) || HighLimit.x > radians(80.0f))
+						throw new runtime_error("Should be able to unlock X axis");
+
+					BulletParentFrame.getBasis().setEulerZYX(M_PI_2, 0, 0);
+					BulletChildFrame.getBasis().setEulerZYX(M_PI_2, 0, 0);
+
+					Switch(&LowLimit.x, &LowLimit.y);
+					Switch(&HighLimit.x, &HighLimit.y);
+				}
+
+				btGeneric6DofSpring2Constraint* Constraint =
+					new btGeneric6DofSpring2Constraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
+				Constraint->setLinearLowerLimit(btVector3(0, 0, 0));
+				Constraint->setLinearUpperLimit(btVector3(0, 0, 0));
+
+				Constraint->setAngularLowerLimit(btVector3(LowLimit.x, LowLimit.y, LowLimit.z));
+				Constraint->setAngularUpperLimit(btVector3(HighLimit.x, HighLimit.y, HighLimit.z));
+
+				for (int i = 0; i < 6; i++)
+					Constraint->setStiffness(i, 0);
+				World->addConstraint(Constraint, true);
+			}
+
+			// btPoint2PointConstraint* Constraint = new btPoint2PointConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint);
+
+			/*
+			btGeneric6DofSpring2Constraint* Constraint =
+				new btGeneric6DofSpring2Constraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
+			Constraint->setLinearLowerLimit(btVector3(0, 0, 0));
+			Constraint->setLinearUpperLimit(btVector3(0, 0, 0));
+			Constraint->setAngularLowerLimit(btVector3(0, 0, -M_PI * 0.5));
+			Constraint->setAngularUpperLimit(btVector3(0, 0, M_PI * 0.5));
+			for (int i = 0; i < 6; i++)
+				Constraint->setStiffness(i, 0);
+			*/
+			
+			/*
+			btConeTwistConstraint* Constraint =
+				new btConeTwistConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
+			Constraint->setLimit(M_PI * 0.1, M_PI * 0.5, 0);
+			*/
+
+			/*
+			btHingeConstraint* Constraint =
+				new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame, false);
+			btVector3 Axis = btVector3(0.0, 1.0, 0.0);
+			Constraint->setAxis(Axis);
+			Constraint->setLimit(-M_PI * 0.5, M_PI * 0.5);
+			*/
 		
-			World->addConstraint(Constraint);
+			// World->addConstraint(Constraint, true);
 		}
 }
 
@@ -363,9 +518,10 @@ btRigidBody* Form::AddDynamicBox(mat4 Transform, vec3 Size, float Mass)
 
 	float MinSize = min(min(Size.x, Size.y), Size.z);
 	float MaxSize = max(max(Size.x, Size.y), Size.z);
-	Body->setCcdMotionThreshold(MinSize * 0.1);
-	Body->setCcdSweptSphereRadius(MinSize * 0.1f);
+	// Body->setCcdMotionThreshold(MinSize * 0.1);
+	// Body->setCcdSweptSphereRadius(MinSize * 0.1f);
 	Body->setFriction(1.0);
+	Body->setRestitution(0.0);
 
 	World->addRigidBody(Body);
 
@@ -444,6 +600,14 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 		SetupOpenGL();
 
 		Char = new Character();
+		// Char->FindBone(L"Bone")->IsLocked = true;
+		// const wstring UnlockedBones[] = { L"Stomach" };
+		// Char->LockEverythingBut(UnlockedBones);
+		/*
+		Char->FindBone(L"Lower Arm Left")->Rotation = rotate(mat4(1.0f), radians(-90.0f), vec3(0, 0, 1));
+		Char->FindBone(L"Lower Arm Right")->Rotation = rotate(mat4(1.0f), radians(-90.0f), vec3(0, 0, 1));
+		Char->UpdateWorldTranforms();
+		*/
 
 		CreateFloor(4.0f, 100.0f, Char->FloorZ);
 

@@ -4,6 +4,9 @@
 #include <iostream>
 #include <vector>
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 #include <windows.h>
 #include <WindowsX.h>
@@ -30,7 +33,11 @@
 using namespace std;
 using namespace glm;
 
-#define PHYSICS_FPS 240
+#if _DEBUG
+#define PHYSICS_FPS 100
+#else
+#define PHYSICS_FPS 2000
+#endif
 
 typedef class Form {
 private:

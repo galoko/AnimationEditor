@@ -14,12 +14,11 @@ using namespace std;
 using namespace glm;
 
 typedef class Bone {
-
 public:
 	uint32 ID;
 	wstring Name;
 
-	vec3 Offset, Tail, Size;
+	vec3 Offset, Tail, Size, LowLimit, HighLimit;
 
 	Bone* Parent;
 	vector<Bone*> Childs;
@@ -30,22 +29,34 @@ public:
 
 	btRigidBody* PhysicBody;
 
-	Bone(uint32 ID, wstring Name, vec3 Offset, vec3 Tail, vec3 Size, Bone* Parent);
+	bool IsLocked;
+
+	vec3 InitialPosition;
+
+	bool IsFixed(void);
+	bool IsOnlyXRotation(void);
+	bool IsOnlyYRotation(void);
+	bool IsOnlyZRotation(void);
+
+	Bone(uint32 ID, wstring Name, vec3 Offset, vec3 Tail, vec3 Size, vec3 LowLimit, vec3 HighLimit, Bone* Parent);
 
 	void UpdateWorldTransform(mat4 ParentModel, vec3 ParentSize);
+	void SaveInitialPosition(void);
 } Bone;
 
 typedef class Character {
 private:
 	uint32 NextBoneID;
 
-	Bone* GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, wstring Name);
+	Bone* GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, vec3 LowLimit, vec3 HighLimit, wstring Name);
 	void GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 MirrorDirection);
 	void GenerateBones(void);
+
+	void SaveInitialPositions(void);
 public:
 	vec3 Position;
 
-	Bone* Spine; // also known as Root
+	Bone* Pelvis; // also known as Root
 
 	vector<Bone*> Bones; // list for easy iterating
 
@@ -56,4 +67,8 @@ public:
 	void UpdateWorldTranforms(void);
 
 	void UpdateFloorZ(void);
+
+	Bone* FindBone(const wstring Name);
+
+	void LockEverythingBut(vector<wstring> BoneNames);
 } Character;
