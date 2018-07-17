@@ -181,6 +181,8 @@ btVector3 GLMToBullet(vec3 v) {
 }
 
 static int Started;
+static bool LastPullState;
+static Bone* PullBone;
 
 void Form::Tick(double dt) {
 
@@ -195,27 +197,41 @@ void Form::Tick(double dt) {
 		uint64 StepCount = (uint64)(PhysicsTime * PHYSICS_FPS);
 		for (; DoneStepCount < StepCount; DoneStepCount++) {
 
+			const float interval = 3;
+			bool pull = (fmod(PhysicsTime, interval * 2) <= interval);
+
+			if (PullBone == nullptr || (pull && !LastPullState)) {
+
+				int BoneNum = rand() % 3;
+
+				wstring BoneNames[] = { L"Head", L"Foot Left", L"Foot Right"};
+
+				PullBone = Char->FindBone(BoneNames[BoneNum]);
+			}
+
+			// pull = true;
+			// PullBone = Char->FindBone(L"Head");
+
 			double dt = 1.0 / (double)PHYSICS_FPS;
 
-			Bone* Bone = Char->FindBone(L"Head");
-
-			vec3 Position = Bone->WorldTransform * Bone->MiddleTranslation * vec4(0, 0, 0, 1);
-			vec3 Velocity = BulletToGLM(Bone->PhysicBody->getLinearVelocity());
-			vec3 DestPosition = Bone->InitialPosition;
+			vec3 Position = PullBone->WorldTransform * PullBone->MiddleTranslation * vec4(0, 0, 0, 1);
+			vec3 Velocity = BulletToGLM(PullBone->PhysicBody->getLinearVelocity());
+			vec3 DestPosition = Char->FindBone(L"Head")->InitialPosition;
 			DestPosition.z += 0.5;
 			vec3 Force = (DestPosition - Position) * 3000.0f - Velocity * 1000.0f;
 
 			btScalar AngleX, AngleY, AngleZ;
-			Bone->PhysicBody->getWorldTransform().getRotation().getEulerZYX(AngleZ, AngleY, AngleX);
-			vec3 AngularVelocity = BulletToGLM(Bone->PhysicBody->getAngularVelocity());
-			vec3 Torque = -vec3(AngleX, AngleY, AngleZ) * 30.0f - AngularVelocity * 1.0f;
+			PullBone->PhysicBody->getWorldTransform().getRotation().getEulerZYX(AngleZ, AngleY, AngleX);
+			vec3 AngularVelocity = BulletToGLM(PullBone->PhysicBody->getAngularVelocity());
+			vec3 Torque = -vec3(AngleX, AngleY, AngleZ) * 300.0f - AngularVelocity * 10.0f;
 
-			const float interval = 3;
 			// PD control		
-			if (fmod(PhysicsTime, interval * 2) <= interval) {
-				Bone->PhysicBody->applyCentralForce(GLMToBullet(Force));
-				Bone->PhysicBody->applyTorque(GLMToBullet(Torque));
+			if (pull) {
+				PullBone->PhysicBody->applyCentralForce(GLMToBullet(Force));
+				// PullBone->PhysicBody->applyTorque(GLMToBullet(Torque));
 			}
+
+			LastPullState = pull;
 
 			// Char->Pelvis->Childs[0]->PhysicBody->applyForce(btVector3(0, 0, 0), btVector3(0, 0, 0));
 			// Char->Pelvis->Childs[0]->PhysicBody->applyTorque(btVector3(0, 0, 100));
@@ -223,7 +239,7 @@ void Form::Tick(double dt) {
 			// Char->FindBone(L"Lower Arm Right")->PhysicBody->applyTorque(btVector3(0, 0, 1));
 			// Char->FindBone(L"Pelvis")->PhysicBody->applyTorque(btVector3(0, -90, 0));
 			// Char->FindBone(L"Neck")->PhysicBody->applyTorque(btVector3(0, 0.1, 0));
-			// Char->FindBone(L"Upper Leg Left")->PhysicBody->applyTorque(btVector3(0, -40.5, 0.0));
+			// Char->FindBone(L"Upper Leg Left")->PhysicBody->applyTorque(btVector3(0, -30.5, 0.0));
 
 			World->stepSimulation(dt, 0, dt);
 		}
@@ -397,12 +413,10 @@ void Form::SetupBulletWorld(void)
 			btTransform BulletChildFrame;
 			BulletChildFrame.setIdentity();
 			BulletChildFrame.setOrigin(BulletChildLocalPoint);
-			// BulletChildFrame.getBasis().setEulerZYX(M_PI / 2, 0, 0);
 
 			btTransform BulletParentFrame;
 			BulletParentFrame.setIdentity();
 			BulletParentFrame.setOrigin(BulletParentLocalPoint);
-			// BulletParentFrame.getBasis().setEulerZYX(M_PI / 2, 0, 0);
 			
 			Parent->PhysicBody->setActivationState(DISABLE_DEACTIVATION);
 			Child->PhysicBody->setActivationState(DISABLE_DEACTIVATION);
@@ -442,18 +456,49 @@ void Form::SetupBulletWorld(void)
 			else
 			// generic 6DOF 
 			{
-				if (LowLimit.y < radians(-80.0f) || HighLimit.y > radians(80.0f)) {
-					// unstable gimbal lock fix
+				// gimbal lock fix
 
-					if (LowLimit.x < radians(-80.0f) || HighLimit.x > radians(80.0f))
-						throw new runtime_error("Should be able to unlock X axis");
+				vec3 Ranges = vec3(
+						max(fabs(LowLimit.x), fabs(HighLimit.x)),
+						max(fabs(LowLimit.y), fabs(HighLimit.y)),
+						max(fabs(LowLimit.z), fabs(HighLimit.z))
+				);
 
-					BulletParentFrame.getBasis().setEulerZYX(M_PI_2, 0, 0);
-					BulletChildFrame.getBasis().setEulerZYX(M_PI_2, 0, 0);
+				float MinRange = min(min(Ranges.x, Ranges.y), Ranges.z);
+				float MaxRange = max(max(Ranges.x, Ranges.y), Ranges.z);
+
+				if (MinRange > 80.0f)
+					throw new runtime_error("Too large angle range");
+
+				// switch Y -> X
+				if (MinRange == Ranges.x) {
+
+					BulletParentFrame.getBasis().setEulerZYX(0, 0, M_PI_2);
+					BulletChildFrame.getBasis().setEulerZYX(0, 0, M_PI_2);
 
 					Switch(&LowLimit.x, &LowLimit.y);
 					Switch(&HighLimit.x, &HighLimit.y);
+
+					Switch(&LowLimit.y, &HighLimit.y);
+					LowLimit.y = -LowLimit.y;
+					HighLimit.y = -HighLimit.y;
 				}
+				else
+				// switch Y -> Z
+				if (MinRange == Ranges.z) {
+
+					BulletParentFrame.getBasis().setEulerZYX(-M_PI_2, 0, 0);
+					BulletChildFrame.getBasis().setEulerZYX(-M_PI_2, 0, 0);
+
+					Switch(&LowLimit.z, &LowLimit.y);
+					Switch(&HighLimit.z, &HighLimit.y);
+
+					Switch(&LowLimit.y, &HighLimit.y);
+					LowLimit.y = -LowLimit.y;
+					HighLimit.y = -HighLimit.y;
+				}
+				else
+					assert(Ranges.y == MinRange);
 
 				btGeneric6DofSpring2Constraint* Constraint =
 					new btGeneric6DofSpring2Constraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
@@ -604,8 +649,8 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 		// const wstring UnlockedBones[] = { L"Stomach" };
 		// Char->LockEverythingBut(UnlockedBones);
 		/*
-		Char->FindBone(L"Lower Arm Left")->Rotation = rotate(mat4(1.0f), radians(-90.0f), vec3(0, 0, 1));
-		Char->FindBone(L"Lower Arm Right")->Rotation = rotate(mat4(1.0f), radians(-90.0f), vec3(0, 0, 1));
+		Bone* Bone = Char->FindBone(L"Lower Leg Left");
+		Bone->Rotation = rotate(mat4(1.0f), Bone->LowLimit.y, vec3(0, -1, 0));
 		Char->UpdateWorldTranforms();
 		*/
 
