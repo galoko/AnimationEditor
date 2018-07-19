@@ -180,71 +180,19 @@ btVector3 GLMToBullet(vec3 v) {
 	return btVector3(v.x, v.y, v.z);
 }
 
-static int Started;
-static bool LastPullState;
-static Bone* PullBone;
-
 void Form::Tick(double dt) {
 
 	PhysicsTime += dt;
-	if (Started || PhysicsTime >= 1.0) {
-		
-		if (!Started) {
-			Started = true;
-			PhysicsTime = 0.0;
-		}
 
-		uint64 StepCount = (uint64)(PhysicsTime * PHYSICS_FPS);
-		for (; DoneStepCount < StepCount; DoneStepCount++) {
+	uint64 StepCount = (uint64)(PhysicsTime * PHYSICS_FPS);
+	for (; DoneStepCount < StepCount; DoneStepCount++) {
 
-			const float interval = 3;
-			bool pull = (fmod(PhysicsTime, interval * 2) <= interval);
+		const double dt = 1.0 / (double)PHYSICS_FPS;
 
-			if (PullBone == nullptr || (pull && !LastPullState)) {
-
-				int BoneNum = rand() % 3;
-
-				wstring BoneNames[] = { L"Head", L"Foot Left", L"Foot Right"};
-
-				PullBone = Char->FindBone(BoneNames[BoneNum]);
-			}
-
-			// pull = true;
-			// PullBone = Char->FindBone(L"Head");
-
-			double dt = 1.0 / (double)PHYSICS_FPS;
-
-			vec3 Position = PullBone->WorldTransform * PullBone->MiddleTranslation * vec4(0, 0, 0, 1);
-			vec3 Velocity = BulletToGLM(PullBone->PhysicBody->getLinearVelocity());
-			vec3 DestPosition = Char->FindBone(L"Head")->InitialPosition;
-			DestPosition.z += 0.5;
-			vec3 Force = (DestPosition - Position) * 3000.0f - Velocity * 1000.0f;
-
-			btScalar AngleX, AngleY, AngleZ;
-			PullBone->PhysicBody->getWorldTransform().getRotation().getEulerZYX(AngleZ, AngleY, AngleX);
-			vec3 AngularVelocity = BulletToGLM(PullBone->PhysicBody->getAngularVelocity());
-			vec3 Torque = -vec3(AngleX, AngleY, AngleZ) * 300.0f - AngularVelocity * 10.0f;
-
-			// PD control		
-			if (pull) {
-				PullBone->PhysicBody->applyCentralForce(GLMToBullet(Force));
-				// PullBone->PhysicBody->applyTorque(GLMToBullet(Torque));
-			}
-
-			LastPullState = pull;
-
-			// Char->Pelvis->Childs[0]->PhysicBody->applyForce(btVector3(0, 0, 0), btVector3(0, 0, 0));
-			// Char->Pelvis->Childs[0]->PhysicBody->applyTorque(btVector3(0, 0, 100));
-			// Char->FindBone(L"Lower Arm Left")->PhysicBody->applyTorque(btVector3(0, 0, -1));
-			// Char->FindBone(L"Lower Arm Right")->PhysicBody->applyTorque(btVector3(0, 0, 1));
-			// Char->FindBone(L"Pelvis")->PhysicBody->applyTorque(btVector3(0, -90, 0));
-			// Char->FindBone(L"Neck")->PhysicBody->applyTorque(btVector3(0, 0.1, 0));
-			// Char->FindBone(L"Upper Leg Left")->PhysicBody->applyTorque(btVector3(0, -30.5, 0.0));
-
-			World->stepSimulation(dt, 0, dt);
-		}
+		World->stepSimulation(dt, 0, dt);
 	}
 	
+	// apply changes to bones
 	for (Bone* Bone : Char->Bones) {
 
 		btTransform BulletTransfrom;
@@ -252,6 +200,9 @@ void Form::Tick(double dt) {
 		
 		Bone->WorldTransform = BulletToGLM(BulletTransfrom) * inverse(Bone->MiddleTranslation);
 	}
+
+	Char->UpdateRotationsFromWorldTransforms();
+	Char->UpdateWorldTranforms();
 
 	StepTime = dt;
 	RedrawWindow(WindowHandle, NULL, 0, RDW_INVALIDATE | RDW_UPDATENOW);
@@ -645,6 +596,8 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 		SetupOpenGL();
 
 		Char = new Character();
+		Char->FindBone(L"Hand Left")->IsLocked = true;
+		Char->FindBone(L"Hand Right")->IsLocked = true;
 		// Char->FindBone(L"Bone")->IsLocked = true;
 		// const wstring UnlockedBones[] = { L"Stomach" };
 		// Char->LockEverythingBut(UnlockedBones);

@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27703.2000
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OpenGL_SimpleBox", "OpenGL_SimpleBox\OpenGL_SimpleBox.vcxproj", "{97F83B24-996F-42A6-95D1-1DA63900535F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "AnimationEditor", "AnimationEditor\AnimationEditor.vcxproj", "{97F83B24-996F-42A6-95D1-1DA63900535F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

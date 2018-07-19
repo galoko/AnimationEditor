@@ -6,6 +6,7 @@ Character::Character(void)
 	UpdateWorldTranforms();
 	UpdateFloorZ();
 	SaveInitialPositions();
+	UpdateRotationsFromWorldTransforms();
 }
 
 Bone* Character::GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, vec3 LowLimit, vec3 HighLimit, wstring Name)
@@ -109,6 +110,11 @@ void Character::UpdateWorldTranforms(void)
 	Pelvis->UpdateWorldTransform(ParentModel, {});
 }
 
+void Character::UpdateRotationsFromWorldTransforms(void)
+{
+	this->Position = Pelvis->UpdateRotationFromWorldTransform(mat4(1.0f));
+}
+
 void Character::UpdateFloorZ(void)
 {
 	FloorZ = 0;
@@ -186,6 +192,24 @@ void Bone::UpdateWorldTransform(mat4 ParentModel, vec3 ParentSize)
 
 	for (Bone* Child : this->Childs)
 		Child->UpdateWorldTransform(this->WorldTransform, this->Size);
+}
+
+vec3 Bone::UpdateRotationFromWorldTransform(mat4 ParentWorldRotation)
+{
+	vec3 Scale, Translation, Skew;
+	quat Orientation;
+	vec4 Perspective;
+
+	decompose(WorldTransform, Scale, Orientation, Translation, Skew, Perspective);
+
+	mat4 Rotation = mat4_cast(Orientation);
+
+	this->Rotation = inverse(ParentWorldRotation) * Rotation;
+
+	for (Bone* Child : this->Childs)
+		Child->UpdateRotationFromWorldTransform(Rotation);
+
+	return Translation;
 }
 
 void Bone::SaveInitialPosition(void)

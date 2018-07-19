@@ -41,6 +41,8 @@ public:
 	Bone(uint32 ID, wstring Name, vec3 Offset, vec3 Tail, vec3 Size, vec3 LowLimit, vec3 HighLimit, Bone* Parent);
 
 	void UpdateWorldTransform(mat4 ParentModel, vec3 ParentSize);
+	vec3 UpdateRotationFromWorldTransform(mat4 ParentWorldRotation);
+
 	void SaveInitialPosition(void);
 } Bone;
 
@@ -65,6 +67,7 @@ public:
 	Character(void);
 
 	void UpdateWorldTranforms(void);
+	void UpdateRotationsFromWorldTransforms(void);
 
 	void UpdateFloorZ(void);
 
