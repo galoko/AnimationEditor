@@ -14,18 +14,21 @@ void(__stdcall *aegSetOpenGLWindow)(HWND Window);
 void(__stdcall *aegSetButtonCallback)(const wchar_t* Name, ButtonCallback Callback);
 void(__stdcall *aegRun)(void);
 
+#define LoadApi(x) TryGetProcAddress(Handle, #x, (void**)&x)
+
 bool SetupExternalGUI(void) {
 
 	HMODULE Handle = LoadLibrary(L"AnimationEditorGUI.dll");
 	if (Handle == 0)
 		return false;
 
-	if (
-		!TryGetProcAddress(Handle, "aegInitialize", (void**)&aegInitialize) ||
-		!TryGetProcAddress(Handle, "aegSetIdleCallback", (void**)&aegSetIdleCallback) ||
-		!TryGetProcAddress(Handle, "aegSetOpenGLWindow", (void**)&aegSetOpenGLWindow) ||
-		!TryGetProcAddress(Handle, "aegSetButtonCallback", (void**)&aegSetButtonCallback) ||
-		!TryGetProcAddress(Handle, "aegRun", (void**)&aegRun)
+	if 
+		(
+		!LoadApi(aegInitialize) ||
+		!LoadApi(aegSetIdleCallback) ||
+		!LoadApi(aegSetOpenGLWindow) ||
+		!LoadApi(aegSetButtonCallback) ||
+		!LoadApi(aegRun)
 		)
 		return false;
 
