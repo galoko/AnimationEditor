@@ -54,7 +54,7 @@ void Form::SetupOpenGL(void) {
 	ColorIntencityID = glGetUniformLocation(ShaderID, "ColorIntencity");
 
 	// Projection matrix : 45° Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
-	Projection = perspective(radians(45.0f), 4.0f / 3.0f, 0.1f, 100.0f);
+	Projection = perspective(radians(45.0f), AspectRatio, 0.1f, 100.0f);
 	// Camera matrix
 	View = lookAt(
 		vec3(2.5f, -2.5, 1.264f),
@@ -537,12 +537,7 @@ void Form::ProcessMouseInput(LONG dx, LONG dy) {
 
 // Window handling
 
-void Form::CreateMainWindow(HINSTANCE hInstance) {
-
-	const WCHAR* WindowClass = L"OpenGLTest";
-	const WCHAR* Title = L"OpenGL Test Box";
-	const int Width = 1280;
-	const int Height = 960;
+HWND Form::CreateMainWindow(HINSTANCE hInstance) {
 
 	WNDCLASSEXW wcex = {};
 	wcex.cbSize = sizeof(WNDCLASSEX);
@@ -576,8 +571,7 @@ void Form::CreateMainWindow(HINSTANCE hInstance) {
 	if (!RegisterRawInputDevices(Rid, 1, sizeof(Rid[0])))
 		throw new runtime_error("Couldn't register raw devices");
 
-	// show the whole thing
-	ShowWindow(WindowHandle, SW_SHOW);
+	return WindowHandle;
 }
 
 LRESULT CALLBACK Form::WndProcStaticCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -597,7 +591,7 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 
 		Char = new Character();
 		Char->FindBone(L"Hand Left")->IsLocked = true;
-		Char->FindBone(L"Hand Right")->IsLocked = true;
+		// Char->FindBone(L"Hand Right")->IsLocked = true;
 		// Char->FindBone(L"Bone")->IsLocked = true;
 		// const wstring UnlockedBones[] = { L"Stomach" };
 		// Char->LockEverythingBut(UnlockedBones);

@@ -43,6 +43,12 @@ typedef class Form {
 private:
 	Form(void);
 
+	const WCHAR* WindowClass = L"OpenGLTest";
+	const WCHAR* Title = L"OpenGL Test Box";
+	const int Width = 1280;
+	const int Height = 720;
+	const float AspectRatio = (float)Width / Height;
+
 	// Integration
 	double StepTime, PhysicsTime;
 	uint64 DoneStepCount;
@@ -106,7 +112,7 @@ public:
 	void operator=(Form const&) = delete;
 
 	// Window handling
-	void CreateMainWindow(HINSTANCE hInstance);
+	HWND CreateMainWindow(HINSTANCE hInstance);
 
 	// Integration
 	void Tick(double dt);

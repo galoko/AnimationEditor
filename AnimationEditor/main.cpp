@@ -18,6 +18,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "shader.hpp"
+#include "ExternalGUI.hpp"
 
 void OpenConsole(void) {
 
@@ -65,33 +66,38 @@ double TimeToSeconds(LONGLONG Time) {
 	return (double)Time / (double)Freq.QuadPart;
 }
 
+static LONGLONG LastTick;
+
+void __stdcall Idle(void) {
+
+	// time calculation
+	LONGLONG Now = GetTime();
+	double dt = TimeToSeconds(Now - LastTick);
+	LastTick = Now;
+
+	// actual draw call
+	Form::GetInstance().Tick(dt);
+}
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
 	_In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
-	OpenConsole();
-
 	InitTime();
 
-	Form::GetInstance().CreateMainWindow(hInstance);
+	if (!SetupExternalGUI())
+		return -1;
 
-	LONGLONG LastTick = GetTime();
+	aegInitialize();
+	aegSetIdleCallback(Idle);
 
-	// Main message loop:
-	while (TRUE) {
+	HWND Window = Form::GetInstance().CreateMainWindow(hInstance);
+	aegSetOpenGLWindow(Window);
 
-		// process input
-		if (!ProcessMessages())
-			break;
+	LastTick = GetTime();
+	aegRun();
 
-		// time calculation
-		LONGLONG Now = GetTime();
-		double dt = TimeToSeconds(Now - LastTick);
-		LastTick = Now;
-
-		// actual draw call
-		Form::GetInstance().Tick(dt);
-	}
+	return 0;
 }
