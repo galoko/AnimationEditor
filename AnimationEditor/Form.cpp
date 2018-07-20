@@ -42,10 +42,6 @@ void Form::SetupOpenGL(void) {
 
 	glEnable(GL_DEPTH_TEST);
 
-	GLuint VertexArrayID;
-	glGenVertexArrays(1, &VertexArrayID);
-	glBindVertexArray(VertexArrayID);
-
 	// Create and compile our GLSL program from the shaders
 	ShaderID = LoadShaders("TransformVertexShader.vertexshader", "ColorFragmentShader.fragmentshader");
 
@@ -53,21 +49,19 @@ void Form::SetupOpenGL(void) {
 	MatrixID = glGetUniformLocation(ShaderID, "MVP");
 	ColorIntencityID = glGetUniformLocation(ShaderID, "ColorIntencity");
 
-	// Projection matrix : 45° Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
 	Projection = perspective(radians(45.0f), AspectRatio, 0.1f, 100.0f);
-	// Camera matrix
-	View = lookAt(
-		vec3(2.5f, -2.5, 1.264f),
-		vec3(0, 0, 0.264f), // and looks at the origin
-		vec3(0, 0, 1)  // Bone is up (set to 0,-1,0 to look upside-down)
-	);
 
-	Vertex cube_mesh[6 * 2 * 3];
-	GenerateCube(cube_mesh);
+	// Camera matrix
+
+	CameraPosition = { 2.5f, -2.5, 1.264f };
+	LookAtPoint({ 0, 0, 0.264f });
+	UpdateViewMatrix();
+
+	GenerateCube(Buffer);
 
 	glGenBuffers(1, &BufferName);
 	glBindBuffer(GL_ARRAY_BUFFER, BufferName);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(cube_mesh), cube_mesh, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(Buffer), Buffer, GL_DYNAMIC_DRAW);
 
 	glClearColor(1, 1, 1, 1);
 
@@ -76,10 +70,8 @@ void Form::SetupOpenGL(void) {
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, floatsizeofmember(Vertex, Position), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Position));
-
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, floatsizeofmember(Vertex, Normal), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Normal));
-
 	glEnableVertexAttribArray(2);
 	glVertexAttribPointer(2, floatsizeofmember(Vertex, Color), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Color));
 }
@@ -126,6 +118,49 @@ void Form::DrawFloor(void)
 	glUniform1f(ColorIntencityID, 0.1f);
 	// draw cube
 	glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
+}
+
+// Camera
+
+void Form::LookAtPoint(vec3 Point)
+{
+	vec3 Direction = normalize(Point - CameraPosition);
+
+	/*
+	Direction.x = sinf(CameraAngleX) * sinf(CameraAngleZ);
+	Direction.y = sinf(CameraAngleX) * cosf(CameraAngleZ);
+	Direction.z = cosf(CameraAngleX);
+	*/
+
+	float SinX = sqrt(1 - Direction.z * Direction.z);
+
+	CameraAngleZ = atan2(Direction.x / SinX, Direction.y / SinX);
+	CameraAngleX = atan2(SinX, Direction.z);
+
+	UpdateViewMatrix();
+}
+
+vec3 Form::GetLookingDirection(void)
+{
+	vec3 Direction;
+	Direction.x = sinf(CameraAngleX) * sinf(CameraAngleZ);
+	Direction.y = sinf(CameraAngleX) * cosf(CameraAngleZ);
+	Direction.z = cosf(CameraAngleX);
+
+	return Direction;
+}
+
+void Form::UpdateViewMatrix(void)
+{
+	CameraAngleZ /= (float)M_PI * 2.0f;
+	CameraAngleZ -= (float)(long)CameraAngleZ;
+	CameraAngleZ *= (float)M_PI * 2.0f;
+
+	CameraAngleX = min(max(0.1f, CameraAngleX), 3.13f);
+
+	vec3 Direction = GetLookingDirection();
+
+	View = lookAt(CameraPosition, CameraPosition + Direction, Up);
 }
 
 // Integration
@@ -182,9 +217,15 @@ btVector3 GLMToBullet(vec3 v) {
 
 void Form::Tick(double dt) {
 
+	ProcessWindowState();
+	ProcessKeyboardInput(dt);
+
 	PhysicsTime += dt;
 
 	uint64 StepCount = (uint64)(PhysicsTime * PHYSICS_FPS);
+	const int MaxSteps = 100;
+	if (DoneStepCount + MaxSteps < StepCount)
+		DoneStepCount = StepCount - MaxSteps;
 	for (; DoneStepCount < StepCount; DoneStepCount++) {
 
 		const double dt = 1.0 / (double)PHYSICS_FPS;
@@ -463,35 +504,6 @@ void Form::SetupBulletWorld(void)
 					Constraint->setStiffness(i, 0);
 				World->addConstraint(Constraint, true);
 			}
-
-			// btPoint2PointConstraint* Constraint = new btPoint2PointConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint);
-
-			/*
-			btGeneric6DofSpring2Constraint* Constraint =
-				new btGeneric6DofSpring2Constraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
-			Constraint->setLinearLowerLimit(btVector3(0, 0, 0));
-			Constraint->setLinearUpperLimit(btVector3(0, 0, 0));
-			Constraint->setAngularLowerLimit(btVector3(0, 0, -M_PI * 0.5));
-			Constraint->setAngularUpperLimit(btVector3(0, 0, M_PI * 0.5));
-			for (int i = 0; i < 6; i++)
-				Constraint->setStiffness(i, 0);
-			*/
-			
-			/*
-			btConeTwistConstraint* Constraint =
-				new btConeTwistConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
-			Constraint->setLimit(M_PI * 0.1, M_PI * 0.5, 0);
-			*/
-
-			/*
-			btHingeConstraint* Constraint =
-				new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame, false);
-			btVector3 Axis = btVector3(0.0, 1.0, 0.0);
-			Constraint->setAxis(Axis);
-			Constraint->setLimit(-M_PI * 0.5, M_PI * 0.5);
-			*/
-		
-			// World->addConstraint(Constraint, true);
 		}
 }
 
@@ -531,8 +543,181 @@ btRigidBody* Form::AddStaticBox(mat4 Transform, vec3 Size)
 
 // Controls
 
-void Form::ProcessMouseInput(LONG dx, LONG dy) {
+void Form::ProcessWindowState(void)
+{
+	bool IsInFocusNow = WindowHandle == GetForegroundWindow();
 
+	if (IsInFocusNow != IsInFocus) {
+
+		IsInFocus = IsInFocusNow;
+
+		ProcessMouseLockState();
+	}
+}
+
+void Form::ProcessMouseInput(LONG dx, LONG dy) {
+	
+	const float Speed = 1.0f / 300;
+
+	if (IsMouseLocked) {
+
+		CameraAngleZ += (float)dx * Speed;
+		CameraAngleX += (float)dy * Speed;
+
+		UpdateViewMatrix();
+	}
+}
+
+void Form::ProcessMouseLockState(void)
+{
+	if (IsMouseLocked && IsInFocus) {
+		if (!IsMouseLockEnforced) {
+			RECT Rect;
+			POINT CursorPoint;
+			if (!GetCursorPos(&CursorPoint)) {
+				GetWindowRect(WindowHandle, &Rect);
+				CursorPoint = { Rect.left + (Rect.right - Rect.left) / 2, Rect.top + (Rect.bottom - Rect.top) / 2 };			
+			}
+			Rect = { CursorPoint.x, CursorPoint.y, CursorPoint.x + 1, CursorPoint.y + 1 };
+			ClipCursor(&Rect);
+			ShowCursor(false);
+
+			IsMouseLockEnforced = true;
+		}
+	}
+	else if (IsMouseLockEnforced) {
+		ShowCursor(true);
+		ClipCursor(NULL);
+
+		IsMouseLockEnforced = false;
+	}
+}
+
+void Form::ProcessKeyboardInput(double dt) {
+
+	if (WasPressed(VK_RBUTTON)) {
+		IsMouseLocked = true;
+		ProcessMouseLockState();
+	}
+	else
+	if (WasUnpressed(VK_RBUTTON)) {
+		IsMouseLocked = false;
+		ProcessMouseLockState();
+	}
+
+	if (WasPressed(VK_LBUTTON) && !IsMouseLocked) {
+
+		Bone* SelectedBone;
+		vec3 WorldPoint, WorldNormal;
+
+		GetBoneFromPoint(MouseX, MouseY, SelectedBone, WorldPoint, WorldNormal);
+
+		if (SelectedBone != nullptr) {
+			printf("Selected: %ws\n", SelectedBone->Name.c_str());
+		}
+	}
+
+	if (IsMouseLocked) {
+		const float Speed = 10.0f;
+		vec3 Offset = {};
+		vec3 Direction = GetLookingDirection();
+		vec3 SideDirection = cross(Direction, Up);
+		vec3 ForwardDirection = cross(Up, SideDirection);
+
+		if (IsPressed('W'))
+			Offset += ForwardDirection;
+		if (IsPressed('S'))
+			Offset -= ForwardDirection;
+		if (IsPressed('D'))
+			Offset += SideDirection;
+		if (IsPressed('A'))
+			Offset -= SideDirection;
+
+		if (dot(Offset, Offset) > 0) {
+			CameraPosition += normalize(Offset) * Speed * (float)dt;
+			UpdateViewMatrix();
+		}
+	}
+
+	memcpy(LastKeyboardState, CurrentKeyboardState, sizeof(LastKeyboardState));
+}
+
+void Form::ProcessMouseFormEvent(void) {
+
+}
+
+void Form::ProcessMouseWheelEvent(float Delta)
+{
+
+}
+
+void Form::GetBoneFromPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal)
+{
+	vec4 RayStart_NDC(
+		((float)MouseX / Width  - 0.5f) *  2.0f,
+		((float)MouseY / Height - 0.5f) * -2.0f, 
+		0,
+		1.0f
+	);
+
+	vec4 RayEnd_NDC(RayStart_NDC.x, RayStart_NDC.y, 1.0, 1.0f);
+
+	mat4 M = inverse(Projection * View);
+
+	vec4 RayStart_world = M * RayStart_NDC;
+	RayStart_world /= RayStart_world.w;
+
+	vec4 RayEnd_world = M * RayEnd_NDC;
+	RayEnd_world /= RayEnd_world.w;
+
+	vec3 Direction = normalize(RayEnd_world - RayStart_world);
+
+	vec3 StartPoint = RayStart_world;
+	vec3 EndPoint = StartPoint + Direction * 1000.0f;
+
+	btCollisionWorld::ClosestRayResultCallback RayCallback(GLMToBullet(StartPoint), GLMToBullet(EndPoint));
+
+	World->rayTest(GLMToBullet(StartPoint), GLMToBullet(EndPoint), RayCallback);
+
+	TouchedBone = NULL;
+	WorldPoint = {};
+	WorldNormal = {};
+
+	if (RayCallback.hasHit()) {
+
+		Bone* Selected = (Bone*)RayCallback.m_collisionObject->getUserPointer();
+		if (Selected != nullptr && Selected != SOLID_ID) {
+
+			TouchedBone = Selected;
+			WorldPoint = BulletToGLM(RayCallback.m_hitPointWorld);
+			WorldNormal = BulletToGLM(RayCallback.m_hitNormalWorld);
+		}
+	}
+}
+
+// Control API
+
+#define IsKeyPressed(x, y) ((x[y] & 0x80) != 0)
+
+bool Form::WasPressed(int Key)
+{
+	return !IsKeyPressed(LastKeyboardState, Key) && IsKeyPressed(CurrentKeyboardState, Key);
+}
+
+bool Form::IsPressed(int Key)
+{
+	return IsKeyPressed(CurrentKeyboardState, Key);
+}
+
+bool Form::WasUnpressed(int Key)
+{
+	return IsKeyPressed(LastKeyboardState, Key) && !IsKeyPressed(CurrentKeyboardState, Key);
+}
+
+void Form::UpdateKeyboardState(void)
+{
+	GetKeyState(0);
+	GetKeyboardState(CurrentKeyboardState);
 }
 
 // Window handling
@@ -591,15 +776,6 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 
 		Char = new Character();
 		Char->FindBone(L"Hand Left")->IsLocked = true;
-		// Char->FindBone(L"Hand Right")->IsLocked = true;
-		// Char->FindBone(L"Bone")->IsLocked = true;
-		// const wstring UnlockedBones[] = { L"Stomach" };
-		// Char->LockEverythingBut(UnlockedBones);
-		/*
-		Bone* Bone = Char->FindBone(L"Lower Leg Left");
-		Bone->Rotation = rotate(mat4(1.0f), Bone->LowLimit.y, vec3(0, -1, 0));
-		Char->UpdateWorldTranforms();
-		*/
 
 		CreateFloor(4.0f, 100.0f, Char->FloorZ);
 
@@ -653,25 +829,40 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 
 		break;
 	}
-	case WM_KEYDOWN: {
+	case WM_MOUSEMOVE:
 
-		int Key = (int)wParam;
-		// ...?
-		break;
-	}
-	case WM_KEYUP: {
+		MouseX = GET_X_LPARAM(lParam);
+		MouseY = GET_Y_LPARAM(lParam);
+		ProcessMouseFormEvent();
 
-		int Key = (int)wParam;
-		// ...?
 		break;
-	}
+	case WM_KEYDOWN: 
+
+		UpdateKeyboardState();
+		ProcessKeyboardInput(0);
+		break;
+	
+	case WM_KEYUP:
+
+		UpdateKeyboardState();
+		ProcessKeyboardInput(0);
+		break;
+
+	case WM_LBUTTONDOWN:
 	case WM_RBUTTONDOWN:
+	case WM_MBUTTONDOWN:
+	case WM_LBUTTONUP:
+	case WM_RBUTTONUP:
+	case WM_MBUTTONUP:
 
-		break;
+		UpdateKeyboardState();
+		ProcessKeyboardInput(0);
+		break;;
+
 	case WM_MOUSEWHEEL: {
 
 		int WheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-		// ...?
+		ProcessMouseWheelEvent((float)WheelDelta / WHEEL_DELTA);
 		break;
 	}
 	case WM_DESTROY:

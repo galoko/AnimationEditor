@@ -30,7 +30,7 @@ implementation
 procedure TAnimationEditorForm.SetOpenGLWindow(Window: HWND);
 begin
   Winapi.Windows.SetParent(Window, OpenGLPanel.Handle);
-  Winapi.Windows.SetWindowPos(Window, 0, 0, 0, 0, 0, SWP_NOSIZE or SWP_NOZORDER);
+  SetWindowPos(Window, 0, 0, 0, 0, 0, SWP_NOSIZE or SWP_NOZORDER);
   ShowWindow(Window, SW_SHOWNA);
 end;
 

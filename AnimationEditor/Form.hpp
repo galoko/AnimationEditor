@@ -48,6 +48,7 @@ private:
 	const int Width = 1280;
 	const int Height = 720;
 	const float AspectRatio = (float)Width / Height;
+	const vec3 Up = { 0, 0, 1 };
 
 	// Integration
 	double StepTime, PhysicsTime;
@@ -62,6 +63,15 @@ private:
 	vec3 FloorPosition, FloorSize;
 	void CreateFloor(float FloorSize2D, float FloorHeight, float FloorZ);
 
+	// Camera
+
+	vec3 CameraPosition;
+	float CameraAngleX, CameraAngleZ;
+
+	void LookAtPoint(vec3 Point);
+	vec3 GetLookingDirection(void);
+	void UpdateViewMatrix(void);
+
 	// OpenGL
 
 	typedef struct Vertex {
@@ -73,6 +83,7 @@ private:
 	GLuint ShaderID, MatrixID, ColorIntencityID;
 	mat4 Projection, View;
 	GLuint BufferName;
+	Vertex Buffer[6 * 2 * 3];
 
 	void SetupOpenGL(void);
 	void DrawScene(void);
@@ -91,13 +102,28 @@ private:
 	btRigidBody* AddStaticBox(mat4 Transform, vec3 Size);
 
 	// Controls
+	BYTE LastKeyboardState[256], CurrentKeyboardState[256];
+	LONG MouseX, MouseY;
+
+	bool WasPressed(int Key);
+	bool IsPressed(int Key);
+	bool WasUnpressed(int Key);
+	void UpdateKeyboardState(void);
+
+	void GetBoneFromPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal);
+
+	void ProcessWindowState(void);
 	void ProcessMouseInput(LONG dx, LONG dy);
+	void ProcessMouseLockState(void);
+	void ProcessKeyboardInput(double dt);
+	void ProcessMouseFormEvent(void);
+	void ProcessMouseWheelEvent(float Delta);
 
 	// Window handling
 
 	HWND WindowHandle;
 	HDC WindowDC;
-	BOOL IsInFocus;
+	bool IsInFocus, IsMouseLocked, IsMouseLockEnforced;
 
 	static LRESULT CALLBACK WndProcStaticCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	LRESULT WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
