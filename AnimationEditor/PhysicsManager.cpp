@@ -25,20 +25,19 @@ void PhysicsManager::Initialize(void)
 	btContactSolverInfo& Solver = World->getSolverInfo();
 	Solver.m_numIterations = 30;
 
+	CreateFloor(4.0f, 100.0f);
+
+	CreatePhysicsForCharacter();
+}
+
+void PhysicsManager::CreatePhysicsForCharacter(void) {
+
 	Character* Char = CharacterManager::GetInstance().GetCharacter();
-
-	CreateFloor(4.0f, 100.0f, Char->FloorZ);
-
-	// creating physical bodies
-	if (FloorSize.length() > 0) {
-		btRigidBody* Floor = AddStaticBox(translate(mat4(1.0f), FloorPosition), FloorSize);
-		Floor->setUserPointer((void*)SOLID_ID);
-	}
 
 	for (Bone* Bone : Char->Bones) {
 
 		float Volume = Bone->Size.x * Bone->Size.y * Bone->Size.z;
-		float Density = 1900;
+		const float Density = 1900;
 		float Mass = Density * Volume;
 
 		if (Bone->IsLocked)
@@ -53,6 +52,9 @@ void PhysicsManager::Initialize(void)
 	for (Bone* Parent : Char->Bones)
 		for (Bone* Child : Parent->Childs) {
 
+			Parent->PhysicBody->setActivationState(DISABLE_DEACTIVATION);
+			Child->PhysicBody->setActivationState(DISABLE_DEACTIVATION);
+
 			vec4 Zero = vec4(0, 0, 0, 1);
 
 			vec3 ChildHead = Child->WorldTransform * Zero;
@@ -62,117 +64,131 @@ void PhysicsManager::Initialize(void)
 			vec3 ChildLocalPoint = ChildHead - ChildPosition;
 			vec3 ParentLocalPoint = ChildHead - ParentPosition;
 
-			btVector3 BulletChildLocalPoint = GLMToBullet(ChildLocalPoint);
-			btVector3 BulletParentLocalPoint = GLMToBullet(ParentLocalPoint);
-
-			btTransform BulletChildFrame;
-			BulletChildFrame.setIdentity();
-			BulletChildFrame.setOrigin(BulletChildLocalPoint);
-
-			btTransform BulletParentFrame;
-			BulletParentFrame.setIdentity();
-			BulletParentFrame.setOrigin(BulletParentLocalPoint);
-
-			Parent->PhysicBody->setActivationState(DISABLE_DEACTIVATION);
-			Child->PhysicBody->setActivationState(DISABLE_DEACTIVATION);
-
-			vec3 LowLimit = Child->LowLimit;
-			vec3 HighLimit = Child->HighLimit;
-
-			if (Child->IsFixed()) {
-
-				btFixedConstraint* Constraint = new btFixedConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
-				World->addConstraint(Constraint, true);
-			}
-			else
-			if (Child->IsOnlyXRotation())
-			{
-				btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
-					btVector3(1, 0, 0), btVector3(1, 0, 0));
-				Constraint->setLimit(LowLimit.x, HighLimit.x);
-				World->addConstraint(Constraint, true);
-			}
-			else
-			if (Child->IsOnlyYRotation())
-			{
-				btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
-					btVector3(0, 1, 0), btVector3(0, 1, 0));
-				Constraint->setLimit(LowLimit.y, HighLimit.y);
-				World->addConstraint(Constraint, true);
-			}
-			else
-			if (Child->IsOnlyZRotation())
-			{
-				btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
-					btVector3(0, 0, 1), btVector3(0, 0, 1));
-				Constraint->setLimit(LowLimit.z, HighLimit.z);
-				World->addConstraint(Constraint, true);
-			}
-			else
-			// generic 6DOF 
-			{
-				// gimbal lock fix
-
-				vec3 Ranges = vec3(
-					max(fabs(LowLimit.x), fabs(HighLimit.x)),
-					max(fabs(LowLimit.y), fabs(HighLimit.y)),
-					max(fabs(LowLimit.z), fabs(HighLimit.z))
-				);
-
-				float MinRange = min(min(Ranges.x, Ranges.y), Ranges.z);
-				float MaxRange = max(max(Ranges.x, Ranges.y), Ranges.z);
-
-				if (MinRange > 80.0f)
-					throw new runtime_error("Too large angle range");
-
-				// switch Y -> X
-				if (MinRange == Ranges.x) {
-
-					BulletParentFrame.getBasis().setEulerZYX(0, 0, M_PI_2);
-					BulletChildFrame.getBasis().setEulerZYX(0, 0, M_PI_2);
-
-					swap(LowLimit.x, LowLimit.y);
-					swap(HighLimit.x, HighLimit.y);
-
-					swap(LowLimit.y, HighLimit.y);
-					LowLimit.y = -LowLimit.y;
-					HighLimit.y = -HighLimit.y;
-				}
-				else
-				// switch Y -> Z
-				if (MinRange == Ranges.z) {
-
-					BulletParentFrame.getBasis().setEulerZYX(-M_PI_2, 0, 0);
-					BulletChildFrame.getBasis().setEulerZYX(-M_PI_2, 0, 0);
-
-					swap(LowLimit.z, LowLimit.y);
-					swap(HighLimit.z, HighLimit.y);
-
-					swap(LowLimit.y, HighLimit.y);
-					LowLimit.y = -LowLimit.y;
-					HighLimit.y = -HighLimit.y;
-				}
-				else
-					assert(Ranges.y == MinRange);
-
-				btGeneric6DofSpring2Constraint* Constraint =
-					new btGeneric6DofSpring2Constraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
-				Constraint->setLinearLowerLimit(btVector3(0, 0, 0));
-				Constraint->setLinearUpperLimit(btVector3(0, 0, 0));
-
-				Constraint->setAngularLowerLimit(btVector3(LowLimit.x, LowLimit.y, LowLimit.z));
-				Constraint->setAngularUpperLimit(btVector3(HighLimit.x, HighLimit.y, HighLimit.z));
-
-				for (int i = 0; i < 6; i++)
-					Constraint->setStiffness(i, 0);
-				World->addConstraint(Constraint, true);
-			}
+			AddConstraint(Parent, Child, ParentLocalPoint, ChildLocalPoint);
 		}
 }
 
-void PhysicsManager::Tick(double dt) {
+void PhysicsManager::AddConstraint(Bone* Parent, Bone* Child, vec3 ParentLocalPoint, vec3 ChildLocalPoint)
+{
+	btVector3 BulletChildLocalPoint = GLMToBullet(ChildLocalPoint);
+	btVector3 BulletParentLocalPoint = GLMToBullet(ParentLocalPoint);
 
-	const int MaxStepsPerTick = 100;
+	btTransform BulletChildFrame;
+	BulletChildFrame.setIdentity();
+	BulletChildFrame.setOrigin(BulletChildLocalPoint);
+
+	btTransform BulletParentFrame;
+	BulletParentFrame.setIdentity();
+	BulletParentFrame.setOrigin(BulletParentLocalPoint);
+
+	vec3 LowLimit = Child->LowLimit;
+	vec3 HighLimit = Child->HighLimit;
+
+	if (Child->IsFixed()) {
+
+		btFixedConstraint* Constraint = new btFixedConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
+		World->addConstraint(Constraint, true);
+	}
+	else
+	if (Child->IsOnlyXRotation())
+	{
+		btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
+			btVector3(1, 0, 0), btVector3(1, 0, 0));
+		Constraint->setLimit(LowLimit.x, HighLimit.x);
+		World->addConstraint(Constraint, true);
+	}
+	else
+	if (Child->IsOnlyYRotation())
+	{
+		btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
+			btVector3(0, 1, 0), btVector3(0, 1, 0));
+		Constraint->setLimit(LowLimit.y, HighLimit.y);
+		World->addConstraint(Constraint, true);
+	}
+	else
+	if (Child->IsOnlyZRotation())
+	{
+		btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
+			btVector3(0, 0, 1), btVector3(0, 0, 1));
+		Constraint->setLimit(LowLimit.z, HighLimit.z);
+		World->addConstraint(Constraint, true);
+	}
+	else
+	// generic 6DOF 
+	{
+		ApplyGimbalLockFix(LowLimit, HighLimit, BulletParentFrame, BulletChildFrame);
+
+		btGeneric6DofSpring2Constraint* Constraint =
+			new btGeneric6DofSpring2Constraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
+		Constraint->setLinearLowerLimit(btVector3(0, 0, 0));
+		Constraint->setLinearUpperLimit(btVector3(0, 0, 0));
+
+		Constraint->setAngularLowerLimit(btVector3(LowLimit.x, LowLimit.y, LowLimit.z));
+		Constraint->setAngularUpperLimit(btVector3(HighLimit.x, HighLimit.y, HighLimit.z));
+
+		for (int i = 0; i < 6; i++)
+			Constraint->setStiffness(i, 0);
+		World->addConstraint(Constraint, true);
+	}
+}
+
+void PhysicsManager::ApplyGimbalLockFix(vec3& LowLimit, vec3& HighLimit, btTransform& ParentFrame, btTransform& ChildFrame)
+{
+	vec3 Ranges = vec3(
+		max(fabs(LowLimit.x), fabs(HighLimit.x)),
+		max(fabs(LowLimit.y), fabs(HighLimit.y)),
+		max(fabs(LowLimit.z), fabs(HighLimit.z))
+	);
+
+	float MinRange = min(min(Ranges.x, Ranges.y), Ranges.z);
+	float MaxRange = max(max(Ranges.x, Ranges.y), Ranges.z);
+
+	if (MinRange > radians(80.0f))
+		throw new runtime_error("Too large angle range");
+
+	// switch Y -> X
+	if (MinRange == Ranges.x) {
+
+		ParentFrame.getBasis().setEulerZYX(0, 0, M_PI_2);
+		ChildFrame.getBasis().setEulerZYX(0, 0, M_PI_2);
+
+		swap(LowLimit.x, LowLimit.y);
+		swap(HighLimit.x, HighLimit.y);
+
+		swap(LowLimit.y, HighLimit.y);
+		LowLimit.y = -LowLimit.y;
+		HighLimit.y = -HighLimit.y;
+	}
+	else
+	// switch Y -> Z
+	if (MinRange == Ranges.z) {
+
+		ParentFrame.getBasis().setEulerZYX(-M_PI_2, 0, 0);
+		ChildFrame.getBasis().setEulerZYX(-M_PI_2, 0, 0);
+
+		swap(LowLimit.z, LowLimit.y);
+		swap(HighLimit.z, HighLimit.y);
+
+		swap(LowLimit.y, HighLimit.y);
+		LowLimit.y = -LowLimit.y;
+		HighLimit.y = -HighLimit.y;
+	}
+	else
+		assert(Ranges.y == MinRange);
+}
+
+void PhysicsManager::CreateFloor(float FloorSize2D, float FloorHeight)
+{
+	Character* Char = CharacterManager::GetInstance().GetCharacter();
+
+	FloorPosition = vec3(0, 0, -FloorHeight * 0.5f + Char->FloorZ);
+	FloorSize = vec3(FloorSize2D, FloorSize2D, FloorHeight);
+
+	btRigidBody* Floor = AddStaticBox(translate(mat4(1.0f), FloorPosition), FloorSize);
+	Floor->setUserPointer((void*)SOLID_ID);
+}
+
+void PhysicsManager::Tick(double dt) {
 
 	PhysicsTime += dt;
 
@@ -182,12 +198,13 @@ void PhysicsManager::Tick(double dt) {
 	if (DoneStepCount + MaxStepsPerTick < StepCount)
 		DoneStepCount = StepCount - MaxStepsPerTick;
 
-	for (; DoneStepCount < StepCount; DoneStepCount++) {
+	for (; DoneStepCount < StepCount; DoneStepCount++) 
+		World->stepSimulation(fixed_dt, 0, fixed_dt);
 
-		const double dt = 1.0 / (double)PHYSICS_FPS;
+	SyncCharacterWithWorld();
+}
 
-		World->stepSimulation(dt, 0, dt);
-	}
+void PhysicsManager::SyncCharacterWithWorld(void) {
 
 	Character* Char = CharacterManager::GetInstance().GetCharacter();
 
@@ -234,12 +251,6 @@ btRigidBody* PhysicsManager::AddDynamicBox(mat4 Transform, vec3 Size, float Mass
 btRigidBody* PhysicsManager::AddStaticBox(mat4 Transform, vec3 Size)
 {
 	return AddDynamicBox(Transform, Size, 0.0f);
-}
-
-void PhysicsManager::CreateFloor(float FloorSize2D, float FloorHeight, float FloorZ)
-{
-	FloorPosition = vec3(0, 0, -FloorHeight * 0.5f + FloorZ);
-	FloorSize = vec3(FloorSize2D, FloorSize2D, FloorHeight);
 }
 
 vec3 PhysicsManager::GetFloorPosition(void)

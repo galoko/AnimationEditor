@@ -2,6 +2,10 @@
 
 #include <windows.h>
 
+#include <glm/glm.hpp>
+
+using namespace glm;
+
 typedef class InputManager {
 private:
 	InputManager(void) { };
@@ -9,6 +13,9 @@ private:
 	BYTE LastKeyboardState[256], CurrentKeyboardState[256];
 	LONG MouseX, MouseY;
 	bool IsInFocus, IsMouseLocked, IsMouseLockEnforced;
+
+	bool HavePickedPoint;
+	vec3 PickedPoint;
 
 	// Internal processing
 	void ProcessMouseLockState(void);

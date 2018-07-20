@@ -35,11 +35,14 @@ private:
 	vec3 CameraPosition;
 	float CameraAngleX, CameraAngleZ;
 
+	vec3 PickedPoint;
+
 	static void GenerateCubeQuad(Vertex* QuadMesh, vec3 normal, vec3 color, uint32 id);
 	static void GenerateCube(Vertex* CubeMesh);
 
 	void DrawCharacter(Character* Char);
 	void DrawFloor(void);
+	void DrawPickedPoint(void);
 
 	void UpdateViewMatrix(void);
 public:
@@ -57,15 +60,19 @@ public:
 	const float AspectRatio = (float)Width / Height;
 	const vec3 Up = { 0, 0, 1 };
 
+	void Initialize(HWND WindowHandle);
+
+	void DrawScene(void);
+
 	void RotateCamera(float OffsetZ, float OffsetX);
 	void MoveCamera(vec3 Offset);
 
 	void LookAtPoint(vec3 Point);
 	vec3 GetLookingDirection(void);
+	vec3 GetCameraPosition(void);
 
-	void Initialize(HWND WindowHandle);
+	void SetPickedPoint(vec3 Point);
 
-	void DrawScene(void);
-
+	void GetPointAndDirectionFromScreenPoint(LONG x, LONG y, vec3& Point, vec3& Direction);
 	void GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal);
 } Render;

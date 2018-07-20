@@ -1,13 +1,10 @@
 #include "InputManager.hpp"
 
-#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Character.hpp"
 #include "Render.hpp"
 #include "PhysicsManager.hpp"
-
-using namespace glm;
 
 void InputManager::Initialize(HWND WindowHandle) {
 
@@ -88,7 +85,15 @@ void InputManager::ProcessKeyboardInput(double dt) {
 		Render::GetInstance().GetBoneFromScreenPoint(MouseX, MouseY, SelectedBone, WorldPoint, WorldNormal);
 
 		if (SelectedBone != nullptr) {
-			printf("Selected: %ws\n", SelectedBone->Name.c_str());
+			PickedPoint = WorldPoint;
+			HavePickedPoint = true;
+
+			Render::GetInstance().SetPickedPoint(PickedPoint);
+		}
+		else {
+			HavePickedPoint = false;
+
+			Render::GetInstance().SetPickedPoint({});
 		}
 	}
 
@@ -122,7 +127,24 @@ void InputManager::ProcessMouseFormEvent(LONG x, LONG y) {
 
 	MouseX = x;
 	MouseY = y;
-	// ...?
+	
+	if (HavePickedPoint) {
+
+		vec3 Point, Direction;
+		Render::GetInstance().GetPointAndDirectionFromScreenPoint(x, y, Point, Direction);
+
+		vec3 PlaneNormal = -Render::GetInstance().GetLookingDirection();
+		float Distance = -dot(PlaneNormal, PickedPoint);
+
+		float t = -(dot(Point, PlaneNormal) + Distance) / dot(Direction, PlaneNormal);
+		vec3 P = Point + t * Direction;
+
+		PickedPoint = P;
+
+		printf("%f %f %f\n", Point.x, Point.y, Point.z);
+
+		Render::GetInstance().SetPickedPoint(PickedPoint);
+	}
 }
 
 void InputManager::ProcessKeyboardEvent(void) {

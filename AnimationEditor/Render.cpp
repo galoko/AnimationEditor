@@ -90,6 +90,8 @@ void Render::DrawScene(void) {
 
 	DrawFloor();
 
+	DrawPickedPoint();
+
 	glFlush();
 	SwapBuffers(WindowDC);
 }
@@ -111,8 +113,7 @@ void Render::DrawCharacter(Character* Char) {
 	}
 }
 
-void Render::DrawFloor(void)
-{
+void Render::DrawFloor(void) {
 	mat4 Translation = translate(mat4(1.0f), PhysicsManager::GetInstance().GetFloorPosition());
 	mat4 SizeMatrix = scale(mat4(1.0f), PhysicsManager::GetInstance().GetFloorSize());
 
@@ -121,6 +122,21 @@ void Render::DrawFloor(void)
 	// setup matrix
 	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, value_ptr(FinalMatrix));
 	glUniform1f(ColorIntencityID, 0.1f);
+	// draw cube
+	glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
+}
+
+void Render::DrawPickedPoint(void) {
+
+	mat4 Translation = translate(mat4(1.0f), PickedPoint);
+	mat4 SizeMatrix = scale(mat4(1.0f), vec3(0.05f));
+	mat4 Rotation = rotate(mat4(1.0f), radians(45.0f), normalize(vec3(1, 1, 0)));
+
+	mat4 FinalMatrix = Projection * View * Translation * Rotation * SizeMatrix;
+
+	// setup matrix
+	glUniformMatrix4fv(MatrixID, 1, GL_FALSE, value_ptr(FinalMatrix));
+	glUniform1f(ColorIntencityID, 1.0f);
 	// draw cube
 	glDrawArrays(GL_TRIANGLES, 0, 12 * 3);
 }
@@ -142,8 +158,8 @@ void Render::MoveCamera(vec3 Offset)
 	UpdateViewMatrix();
 }
 
-void Render::LookAtPoint(vec3 Point)
-{
+void Render::LookAtPoint(vec3 Point) {
+
 	vec3 Direction = normalize(Point - CameraPosition);
 
 	float SinX = sqrt(1 - Direction.z * Direction.z);
@@ -154,8 +170,8 @@ void Render::LookAtPoint(vec3 Point)
 	UpdateViewMatrix();
 }
 
-vec3 Render::GetLookingDirection(void)
-{
+vec3 Render::GetLookingDirection(void) {
+
 	vec3 Direction;
 	Direction.x = sinf(CameraAngleX) * sinf(CameraAngleZ);
 	Direction.y = sinf(CameraAngleX) * cosf(CameraAngleZ);
@@ -164,8 +180,18 @@ vec3 Render::GetLookingDirection(void)
 	return Direction;
 }
 
-void Render::GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal)
+vec3 Render::GetCameraPosition(void)
 {
+	return CameraPosition;
+}
+
+void Render::SetPickedPoint(vec3 Point) {
+
+	PickedPoint = Point;
+}
+
+void Render::GetPointAndDirectionFromScreenPoint(LONG x, LONG y, vec3& Point, vec3 & Direction) {
+
 	vec4 RayStartScreen(
 		((float)x / Width - 0.5f) * 2.0f,
 		((float)y / Height - 0.5f) * -2.0f,
@@ -183,9 +209,17 @@ void Render::GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& Wo
 	vec4 RayEndWorld = M * RayEndScreen;
 	RayEndWorld /= RayEndWorld.w;
 
-	vec3 Direction = normalize(RayEndWorld - RayStartWorld);
+	Point = RayStartWorld;
+	Direction = normalize(RayEndWorld - RayStartWorld);
+}
 
-	return PhysicsManager::GetInstance().GetBoneFromRay(RayStartWorld, Direction, TouchedBone, WorldPoint, WorldNormal);
+void Render::GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal)
+{
+	vec3 Point, Direction;
+
+	GetPointAndDirectionFromScreenPoint(x, y, Point, Direction);
+
+	return PhysicsManager::GetInstance().GetBoneFromRay(Point, Direction, TouchedBone, WorldPoint, WorldNormal);
 }
 
 // Model Generation

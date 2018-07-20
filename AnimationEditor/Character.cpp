@@ -10,7 +10,6 @@ Character::Character(void)
 	UpdateWorldTranforms();
 	UpdateFloorZ();
 	SaveInitialPositions();
-	UpdateRotationsFromWorldTransforms();
 }
 
 Bone* Character::GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, vec3 LowLimit, vec3 HighLimit, wstring Name)
