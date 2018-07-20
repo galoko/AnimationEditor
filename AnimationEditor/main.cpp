@@ -1,24 +1,11 @@
-#include "Form.hpp"
-
-#define GLEW_STATIC
-// Windows Header Files:
 #include <windows.h>
-#include <WindowsX.h>
 
-#include <string>
-#include <iostream>
-#include <vector>
-
-#include <GL/glew.h>
-
-#include <GL/gl.h>			/* OpenGL header file */
-#include <GL/glu.h>			/* OpenGL utilities header file */
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-#include "shader.hpp"
 #include "ExternalGUI.hpp"
+#include "CharacterManager.hpp"
+#include "Form.hpp"
+#include "Render.hpp"
+#include "InputManager.hpp"
+#include "PhysicsManager.hpp"
 
 void OpenConsole(void) {
 
@@ -27,23 +14,6 @@ void OpenConsole(void) {
 
 	FILE* fp;
 	freopen_s(&fp, "CONOUT$", "w", stdout);
-}
-
-bool ProcessMessages(void) {
-
-	MSG Msg;
-
-	// messages
-	while (PeekMessage(&Msg, NULL, 0, 0, PM_REMOVE)) {
-
-		if (Msg.message == WM_QUIT)
-			return false;
-
-		TranslateMessage(&Msg);
-		DispatchMessage(&Msg);
-	}
-
-	return true;
 }
 
 static LARGE_INTEGER Freq;
@@ -95,8 +65,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	aegInitialize();
 	aegSetIdleCallback(Idle);
 
-	HWND Window = Form::GetInstance().CreateMainWindow(hInstance);
-	aegSetOpenGLWindow(Window);
+	CharacterManager::GetInstance().Initialize();
+	HWND WindowHandle = Form::GetInstance().Initialize(hInstance);
+	Render::GetInstance().Initialize(WindowHandle);
+	InputManager::GetInstance().Initialize(WindowHandle);
+	PhysicsManager::GetInstance().Initialize();
+
+	aegSetOpenGLWindow(WindowHandle);
 
 	LastTick = GetTime();
 	aegRun();

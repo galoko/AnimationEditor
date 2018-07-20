@@ -1,5 +1,9 @@
 #include "Character.hpp"
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
+
 Character::Character(void)
 {
 	GenerateBones();
