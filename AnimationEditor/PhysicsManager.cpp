@@ -190,6 +190,8 @@ void PhysicsManager::CreateFloor(float FloorSize2D, float FloorHeight)
 
 void PhysicsManager::Tick(double dt) {
 
+	return;
+
 	PhysicsTime += dt;
 
 	uint64 StepCount = (uint64)(PhysicsTime * PHYSICS_FPS);

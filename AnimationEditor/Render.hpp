@@ -22,23 +22,27 @@ private:
 
 	typedef struct Vertex {
 
-		vec3 Position, Normal, Color;
+		vec3 Position, Normal;
+		vec2 TexCoord;
 
 	} Vertex;
 
-	GLuint ShaderID, MatrixID, ColorIntencityID;
+	GLuint 
+		ShaderID,
+		ProjectionID, ViewID, ModelID, ModelNormalID,
+		DiffuseColorID, SpecularColorID,
+		IsLightEnabledID, LightPositionID, LightDirectionID, LightAmbientColorID, LightDiffuseColorID, LightPowerID;
+
 	mat4 Projection, View;
 
 	GLuint BufferName;
-	Vertex Buffer[6 * 2 * 3];
+	uint32 CubeStart, CubeSize, SphereStart, SphereSize, PlaneStart, PlaneSize, LineStart, LineSize;
 
 	vec3 CameraPosition;
 	float CameraAngleX, CameraAngleZ;
 
-	vec3 PickedPoint;
-
-	static void GenerateCubeQuad(Vertex* QuadMesh, vec3 normal, vec3 color, uint32 id);
-	static void GenerateCube(Vertex* CubeMesh);
+	void LoadPrimitiveModel(const wchar_t* ModelName, Vertex* Buffer, uint32 BufferSize, uint32 &DestIndex, uint32 &ResultIndex, uint32& ResultSize);
+	void LoadPrimitiveModels(void);
 
 	void DrawCharacter(Character* Char);
 	void DrawFloor(void);
@@ -70,8 +74,6 @@ public:
 	void LookAtPoint(vec3 Point);
 	vec3 GetLookingDirection(void);
 	vec3 GetCameraPosition(void);
-
-	void SetPickedPoint(vec3 Point);
 
 	void GetPointAndDirectionFromScreenPoint(LONG x, LONG y, vec3& Point, vec3& Direction);
 	void GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal);

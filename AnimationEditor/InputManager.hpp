@@ -12,10 +12,24 @@ private:
 
 	BYTE LastKeyboardState[256], CurrentKeyboardState[256];
 	LONG MouseX, MouseY;
-	bool IsInFocus, IsMouseLocked, IsMouseLockEnforced;
+	bool IsInFocus;
+
+	typedef enum State {
+		InteractionMode,
+		CameraMode
+	} State;
+
+	State State;
+	bool IsMouseLockEnforced;
 
 	bool HavePickedPoint;
-	vec3 PickedPoint;
+	vec3 PickedPoint, PlaneNormal;
+	float PlaneDistance;
+
+	vec3 SavedCameraPosition;
+
+	void CorrectPlaneDistance(void);
+	void SyncPickedPointWithScreenCoord(LONG x, LONG y);
 
 	// Internal processing
 	void ProcessMouseLockState(void);
@@ -40,6 +54,8 @@ public:
 
 	void Tick(double dt);
 	void SetFocus(bool IsInFocusNow);
+
+	bool GetPickedPoint(vec3& PickedPoint, vec3& PlaneNormal, float& PlaneDistance);
 
 	void ProcessMouseInput(LONG dx, LONG dy);	
 	void ProcessMouseFormEvent(LONG x, LONG y);

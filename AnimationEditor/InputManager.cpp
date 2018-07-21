@@ -34,9 +34,24 @@ void InputManager::SetFocus(bool IsInFocusNow) {
 	}
 }
 
+bool InputManager::GetPickedPoint(vec3& PickedPoint, vec3& PlaneNormal, float& PlaneDistance)
+{
+	if (HavePickedPoint) {
+
+		PickedPoint = this->PickedPoint;
+		PlaneNormal = this->PlaneNormal;
+		PlaneDistance = this->PlaneDistance;
+
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
 void InputManager::ProcessMouseLockState(void)
 {
-	if (IsMouseLocked && IsInFocus) {
+	if (State == CameraMode && IsInFocus) {
 
 		POINT CursorPoint;
 		if (!IsMouseLockEnforced && GetCursorPos(&CursorPoint)) {
@@ -59,25 +74,66 @@ void InputManager::ProcessMouseLockState(void)
 
 void InputManager::ProcessMouseInput(LONG dx, LONG dy) {
 
-	if (IsMouseLocked && IsInFocus) {
+	if (State == CameraMode && IsInFocus) {
+
 		const float Speed = 1.0f / 300;
 		Render::GetInstance().RotateCamera((float)dx * Speed, (float)dy * Speed);
+
+		PlaneNormal = -Render::GetInstance().GetLookingDirection();
+		/*
+		if (HavePickedPoint)
+			CorrectPlaneDistance();
+		*/
+	}
+}
+
+void InputManager::CorrectPlaneDistance(void) {
+
+	vec3 CameraPosition = Render::GetInstance().GetCameraPosition();
+
+	float OldDistancePlaneToCamera = dot(CameraPosition, PlaneNormal) - PlaneDistance;
+
+	PlaneNormal = -Render::GetInstance().GetLookingDirection();
+
+	vec3 NewPlaneCenter = CameraPosition - PlaneNormal * OldDistancePlaneToCamera;
+
+	PlaneDistance = dot(NewPlaneCenter, PlaneNormal);
+
+	SyncPickedPointWithScreenCoord(MouseX, MouseY);
+}
+
+void InputManager::SyncPickedPointWithScreenCoord(LONG x, LONG y) {
+
+	vec3 Point, Direction;
+	Render::GetInstance().GetPointAndDirectionFromScreenPoint(x, y, Point, Direction);
+
+	float c = dot(Direction, PlaneNormal);
+	if (c < 0) {
+
+		float t = -(dot(Point, PlaneNormal) - PlaneDistance) / c;
+		vec3 P = Point + t * Direction;
+
+		PickedPoint = P;
 	}
 }
 
 void InputManager::ProcessKeyboardInput(double dt) {
 
 	if (WasPressed(VK_RBUTTON)) {
-		IsMouseLocked = true;
+
+		SavedCameraPosition = Render::GetInstance().GetCameraPosition();
+
+		State = CameraMode;
 		ProcessMouseLockState();
 	}
 	else
 	if (WasUnpressed(VK_RBUTTON)) {
-		IsMouseLocked = false;
+
+		State = InteractionMode;
 		ProcessMouseLockState();
 	}
 
-	if (WasPressed(VK_LBUTTON) && !IsMouseLocked) {
+	if (WasPressed(VK_LBUTTON) && State == InteractionMode) {
 
 		Bone* SelectedBone;
 		vec3 WorldPoint, WorldNormal;
@@ -88,16 +144,15 @@ void InputManager::ProcessKeyboardInput(double dt) {
 			PickedPoint = WorldPoint;
 			HavePickedPoint = true;
 
-			Render::GetInstance().SetPickedPoint(PickedPoint);
+			PlaneNormal = -Render::GetInstance().GetLookingDirection();
+			PlaneDistance = dot(PlaneNormal, PickedPoint);
 		}
 		else {
 			HavePickedPoint = false;
-
-			Render::GetInstance().SetPickedPoint({});
 		}
 	}
 
-	if (IsMouseLocked) {
+	if (State == CameraMode) {
 		const float Speed = 10.0f;
 		vec3 Offset = {};
 		vec3 Direction = Render::GetInstance().GetLookingDirection();
@@ -122,28 +177,16 @@ void InputManager::ProcessKeyboardInput(double dt) {
 	memcpy(LastKeyboardState, CurrentKeyboardState, sizeof(LastKeyboardState));
 }
 
-
 void InputManager::ProcessMouseFormEvent(LONG x, LONG y) {
 
 	MouseX = x;
 	MouseY = y;
 	
-	if (HavePickedPoint) {
+	if (HavePickedPoint && State == InteractionMode) {
 
-		vec3 Point, Direction;
-		Render::GetInstance().GetPointAndDirectionFromScreenPoint(x, y, Point, Direction);
+		PlaneNormal = -Render::GetInstance().GetLookingDirection();
 
-		vec3 PlaneNormal = -Render::GetInstance().GetLookingDirection();
-		float Distance = -dot(PlaneNormal, PickedPoint);
-
-		float t = -(dot(Point, PlaneNormal) + Distance) / dot(Direction, PlaneNormal);
-		vec3 P = Point + t * Direction;
-
-		PickedPoint = P;
-
-		printf("%f %f %f\n", Point.x, Point.y, Point.z);
-
-		Render::GetInstance().SetPickedPoint(PickedPoint);
+		SyncPickedPointWithScreenCoord(MouseX, MouseY);
 	}
 }
 

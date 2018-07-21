@@ -1,17 +1,41 @@
 #version 330 core
 
-layout(location = 0) in vec3 Position;
-layout(location = 1) in vec3 Normal;
-layout(location = 2) in vec3 Color;
+layout(location = 0) in vec3 VertexPosition;
+layout(location = 1) in vec3 VertexNormal;
+layout(location = 2) in vec2 VertexTexCoord;
 
-out vec3 fragmentColor;
+out vec2 TexCoord;
+out vec3 WorldPosition;
+out vec3 CameraNormal;
+out vec3 CameraEyeDirection;
+out vec3 CameraLightDirection;
 
-uniform mat4 MVP;
-uniform float ColorIntencity;
+uniform mat4 Projection;
+uniform mat4 View;
+uniform mat4 Model;
+uniform mat4 ModelNormal;
+uniform vec3 LightPosition;
+uniform vec3 LightDirection;
 
 void main(){	
 
-	gl_Position =  MVP * vec4(Position, 1);
-	fragmentColor = Color * ColorIntencity;
+	gl_Position = Projection * View * Model * vec4(VertexPosition, 1);
+    
+    WorldPosition = (Model * vec4(VertexPosition, 1)).xyz;
+    
+    // вектор от камеры до вершины
+    vec3 CameraPosition = (View * Model * vec4(VertexPosition, 1)).xyz;
+    // вектор от вершины до камеры
+	CameraEyeDirection = vec3(0,0,0) - CameraPosition;
+    
+    // вектор от камеры до источника света
+    vec3 CameraLightPosition = (View * vec4(LightPosition, 1)).xyz;
+    // вектор от вершины до источника света (для света напрямую из источника на вершину)
+	CameraLightDirection = CameraLightPosition + CameraEyeDirection;
+    // для света по направлению камеры
+    CameraLightDirection = CameraEyeDirection;
+    
+    CameraNormal = (View * ModelNormal * vec4(VertexNormal, 0)).xyz;
+        
+    TexCoord = VertexTexCoord;
 }
-

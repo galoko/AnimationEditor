@@ -1,9 +1,44 @@
 #version 330 core
 
-in vec3 fragmentColor;
-out vec3 color;
+in vec2 TexCoord;
+in vec3 WorldPosition;
+in vec3 CameraNormal;
+in vec3 CameraEyeDirection;
+in vec3 CameraLightDirection;
+
+out vec4 Color;
+
+uniform vec4 DiffuseColor;
+uniform vec3 SpecularColor;
+
+uniform bool IsLightEnabled;
+uniform vec3 LightPosition;
+uniform vec3 LightAmbientColor;
+uniform vec3 LightDiffuseColor;
+uniform float LightPower;
 
 void main(){
 
-	color = fragmentColor;
+    if (IsLightEnabled) {
+        
+        // float distance = length(LightPosition - WorldPosition);
+        float distance = 1.0;
+        
+        vec3 Normal = normalize(CameraNormal);
+        vec3 LightDirection = normalize(CameraLightDirection);   
+        float cosTheta = clamp(dot(Normal, LightDirection), 0, 1);
+        
+        vec3 EyeDirection = normalize(CameraEyeDirection);
+        vec3 Reflection = reflect(-LightDirection, Normal);
+        float cosAlpha = clamp(dot(EyeDirection, Reflection), 0, 1);
+
+        Color = 
+            DiffuseColor           * vec4(LightAmbientColor, 1) +
+            DiffuseColor           * vec4(LightDiffuseColor, 0) * LightPower * cosTheta         / (distance*distance) +
+            vec4(SpecularColor, 0) * vec4(LightDiffuseColor, 0) * LightPower * pow(cosAlpha, 5) / (distance*distance);
+            
+    } else {
+    
+        Color = DiffuseColor;
+    }
 }
