@@ -326,8 +326,19 @@ void Render::GetPointAndDirectionFromScreenPoint(LONG x, LONG y, vec3& Point, ve
 	Direction = normalize(RayEndWorld - RayStartWorld);
 }
 
-void Render::GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal)
-{
+void Render::GetScreenPointFromPoint(vec3 Point, LONG& x, LONG& y) {
+
+	mat4 M = Projection * View;
+
+	vec4 ScreenPoint = M * vec4(Point, 1);
+	ScreenPoint /= ScreenPoint.w;
+
+	x = (LONG)round(((ScreenPoint.x /  2.0f) + 0.5f) * Width);
+	y = (LONG)round(((ScreenPoint.y / -2.0f) + 0.5f) * Height);
+}
+
+void Render::GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal) {
+
 	vec3 Point, Direction;
 
 	GetPointAndDirectionFromScreenPoint(x, y, Point, Direction);

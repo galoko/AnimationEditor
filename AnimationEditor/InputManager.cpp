@@ -8,6 +8,8 @@
 
 void InputManager::Initialize(HWND WindowHandle) {
 
+	this->WindowHandle = WindowHandle;
+
 	RAWINPUTDEVICE Rid[1] = {};
 
 	Rid[0].usUsagePage = 0x01;
@@ -69,6 +71,17 @@ void InputManager::ProcessMouseLockState(void)
 		ClipCursor(NULL);
 
 		IsMouseLockEnforced = false;
+
+		if (HavePickedPoint) {
+
+			LONG x, y;
+			Render::GetInstance().GetScreenPointFromPoint(PickedPoint, x, y);
+
+			POINT ScreenPoint = { x, y };
+			ClientToScreen(WindowHandle, &ScreenPoint);
+
+			SetCursorPos(ScreenPoint.x, ScreenPoint.y);
+		}
 	}
 }
 
@@ -80,6 +93,7 @@ void InputManager::ProcessMouseInput(LONG dx, LONG dy) {
 		Render::GetInstance().RotateCamera((float)dx * Speed, (float)dy * Speed);
 
 		PlaneNormal = -Render::GetInstance().GetLookingDirection();
+		PlaneDistance = dot(PlaneNormal, PickedPoint);
 		/*
 		if (HavePickedPoint)
 			CorrectPlaneDistance();

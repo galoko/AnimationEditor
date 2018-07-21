@@ -10,6 +10,8 @@ typedef class InputManager {
 private:
 	InputManager(void) { };
 
+	HWND WindowHandle;
+
 	BYTE LastKeyboardState[256], CurrentKeyboardState[256];
 	LONG MouseX, MouseY;
 	bool IsInFocus;

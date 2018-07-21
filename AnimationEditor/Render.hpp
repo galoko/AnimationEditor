@@ -76,5 +76,6 @@ public:
 	vec3 GetCameraPosition(void);
 
 	void GetPointAndDirectionFromScreenPoint(LONG x, LONG y, vec3& Point, vec3& Direction);
+	void GetScreenPointFromPoint(vec3 Point, LONG& x, LONG& y);
 	void GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal);
 } Render;
