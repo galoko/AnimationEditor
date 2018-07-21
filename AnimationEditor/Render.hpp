@@ -44,6 +44,14 @@ private:
 	void LoadPrimitiveModel(const wchar_t* ModelName, Vertex* Buffer, uint32 BufferSize, uint32 &DestIndex, uint32 &ResultIndex, uint32& ResultSize);
 	void LoadPrimitiveModels(void);
 
+	void SetWireframeMode(bool IsWireFrame);
+	void SetColors(vec4 DiffuseColor, vec3 SpecularColor = { 0, 0, 0 });
+
+	void DrawCube(vec3 Position, mat4 Rotation, vec3 Size);
+	void DrawCube(mat4 Model, vec3 Size);
+	void DrawPlane(vec3 Position, vec3 Normal, vec3 Size);
+	void DrawSphere(vec3 Position, mat4 Rotation, vec3 Size);
+
 	void DrawCharacter(Character* Char);
 	void DrawFloor(void);
 	void DrawPickedPoint(void);

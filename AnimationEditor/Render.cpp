@@ -17,138 +17,6 @@
 #include "CharacterManager.hpp"
 #include "shader.hpp"
 
-#define floatsizeofmember(s, m) (sizeof((((s*)0)->m)) / sizeof(GLfloat))
-
-void Render::Initialize(HWND WindowHandle) {
-
-	PIXELFORMATDESCRIPTOR PixelFormatDesc =
-	{
-		sizeof(PIXELFORMATDESCRIPTOR),
-		1,
-		PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
-		PFD_TYPE_RGBA,
-		32,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		24,                   // Number of bits for the depthbuffer
-		8,                    // Number of bits for the stencilbuffer
-		0,                    // Number of Aux buffers in the framebuffer.
-		PFD_MAIN_PLANE,
-		0, 0, 0, 0
-	};
-
-	WindowDC = GetDC(WindowHandle);
-	int PixelFormat = ChoosePixelFormat(WindowDC, &PixelFormatDesc);
-	SetPixelFormat(WindowDC, PixelFormat, &PixelFormatDesc);
-
-	HGLRC hGL = wglCreateContext(WindowDC);
-	if (!wglMakeCurrent(WindowDC, hGL))
-		throw new runtime_error("Couldn't assign DC to OpenGL");
-
-	glewExperimental = true; // Needed for core profile
-	if (glewInit() != GLEW_OK)
-		throw new runtime_error("Couldn't init GLEW");
-
-	glEnable(GL_DEPTH_TEST);
-
-	// Enable blending
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	glEnable(GL_CULL_FACE);
-	glFrontFace(GL_CCW);
-
-	// Create and compile our GLSL program from the shaders
-	ShaderID = LoadShaders("TransformVertexShader.vertexshader", "ColorFragmentShader.fragmentshader");
-
-	ProjectionID = glGetUniformLocation(ShaderID, "Projection");
-	ViewID = glGetUniformLocation(ShaderID, "View");
-	ModelID = glGetUniformLocation(ShaderID, "Model");
-	ModelNormalID = glGetUniformLocation(ShaderID, "ModelNormal");
-
-	DiffuseColorID = glGetUniformLocation(ShaderID, "DiffuseColor");
-	SpecularColorID = glGetUniformLocation(ShaderID, "SpecularColor");
-
-	IsLightEnabledID = glGetUniformLocation(ShaderID, "IsLightEnabled");
-	LightPositionID = glGetUniformLocation(ShaderID, "LightPosition");
-	LightDirectionID = glGetUniformLocation(ShaderID, "LightDirection");
-	LightAmbientColorID = glGetUniformLocation(ShaderID, "LightAmbientColor");
-	LightDiffuseColorID = glGetUniformLocation(ShaderID, "LightDiffuseColor");
-	LightPowerID = glGetUniformLocation(ShaderID, "LightPower");
-
-	glUseProgram(ShaderID);
-
-	Projection = perspective(radians(45.0f), AspectRatio, 0.1f, 100.0f);
-	glUniformMatrix4fv(ProjectionID, 1, GL_FALSE, value_ptr(Projection));
-
-	// Camera matrix
-
-	CameraPosition = { 2.5f, -2.5, 1.264f };
-	LookAtPoint({ 0, 0, 0.264f });
-	UpdateViewMatrix();
-
-	LoadPrimitiveModels();
-
-	glClearColor(1, 1, 1, 1);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, floatsizeofmember(Vertex, Position), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Position));
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, floatsizeofmember(Vertex, Normal), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Normal));
-	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, floatsizeofmember(Vertex, TexCoord), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, TexCoord));
-
-	vec3 LightAmbientColor = { 0.3, 0.3, 0.3 };
-	vec3 LightDiffuseColor = { 1.0, 1.0, 1.0 };
-	float LightPower = 1;
-
-	glUniform1i(IsLightEnabledID, GL_TRUE);
-	glUniform3fv(LightAmbientColorID, 1, value_ptr(LightAmbientColor));
-	glUniform3fv(LightDiffuseColorID, 1, value_ptr(LightDiffuseColor));
-	glUniform1f(LightPowerID, LightPower);
-}
-
-void Render::LoadPrimitiveModel(const wchar_t* ModelName, Vertex* Buffer, uint32 BufferSize, uint32 &DestIndex, 
-	uint32 &ResultIndex, uint32& ResultSize) {
-	
-	wstring FileName = L".\\Models\\" + wstring(ModelName) + L".bin";
-
-	FILE* ModelFile = _wfopen(FileName.c_str(), L"rb");
-
-	uint32 Remaining = BufferSize - DestIndex;
-
-	uint32 Readed = (uint32) fread(Buffer + DestIndex, sizeof(Vertex), Remaining, ModelFile);
-
-	ResultIndex = DestIndex;
-	ResultSize = Readed;
-
-	DestIndex += Readed;
-
-	fclose(ModelFile);
-}
-
-void Render::LoadPrimitiveModels(void) {
-
-	glGenBuffers(1, &BufferName);
-	glBindBuffer(GL_ARRAY_BUFFER, BufferName);
-
-	const int BufferSize = 500;
-	Vertex Buffer[BufferSize];
-
-	uint32 CurrentIndex = 0;
-
-	LoadPrimitiveModel(L"plane", Buffer, BufferSize, CurrentIndex, PlaneStart, PlaneSize);
-	LoadPrimitiveModel(L"cube", Buffer, BufferSize, CurrentIndex, CubeStart, CubeSize);
-	LoadPrimitiveModel(L"sphere", Buffer, BufferSize, CurrentIndex, SphereStart, SphereSize);
-
-	// line
-	LineStart = CurrentIndex;
-	Buffer[CurrentIndex++] = { { -0.5f, 0, 0 }, {}, {} };
-	Buffer[CurrentIndex++] = { {  0.5f, 0, 0 }, {}, {} };
-	LineSize = CurrentIndex - LineStart;
-
-	glBufferData(GL_ARRAY_BUFFER, CurrentIndex * sizeof(Vertex), Buffer, GL_STATIC_DRAW);
-}
-
 void Render::DrawScene(void) {
 
 	// Clear the screen
@@ -167,44 +35,22 @@ void Render::DrawScene(void) {
 
 void Render::DrawCharacter(Character* Char) {
 
-	vec4 DiffuseColor = { 0.7, 0.7, 0.7, 1 };
-	vec3 SpecularColor = { 0, 0, 0 };
+	SetWireframeMode(false);
+	SetColors({ 0.7, 0.7, 0.7, 1 });
 
-	glUniform4fv(DiffuseColorID, 1, value_ptr(DiffuseColor));
-	glUniform3fv(SpecularColorID, 1, value_ptr(SpecularColor));
-
-	for (Bone* Bone : Char->Bones) {
-
-		mat4 SizeMatrix = scale(mat4(1.0f), Bone->Size);
-		mat4 Model = Bone->WorldTransform * Bone->MiddleTranslation;
-
-		mat4 FinalModel = Model * SizeMatrix;
-
-		// setup matrix
-		glUniformMatrix4fv(ModelNormalID, 1, GL_FALSE, value_ptr(Model));
-		glUniformMatrix4fv(ModelID, 1, GL_FALSE, value_ptr(FinalModel));
-		glDrawArrays(GL_TRIANGLES, CubeStart, CubeSize);
-	}
+	for (Bone* Bone : Char->Bones)
+		DrawCube(Bone->WorldTransform * Bone->MiddleTranslation, Bone->Size);
 }
 
 void Render::DrawFloor(void) {
 
-	vec4 DiffuseColor = { 0, 0, 0, 1 };
-	vec3 SpecularColor = { 0, 0, 0 };
+	SetWireframeMode(false);
+	SetColors({ 0, 0, 0, 1 });
 
-	glUniform4fv(DiffuseColorID, 1, value_ptr(DiffuseColor));
-	glUniform3fv(SpecularColorID, 1, value_ptr(SpecularColor));
+	vec3 Position = PhysicsManager::GetInstance().GetFloorPosition();
+	vec3 Size = PhysicsManager::GetInstance().GetFloorSize();
 
-	mat4 Translation = translate(mat4(1.0f), PhysicsManager::GetInstance().GetFloorPosition());
-	mat4 SizeMatrix = scale(mat4(1.0f), PhysicsManager::GetInstance().GetFloorSize());
-
-	mat4 FinalModel = Translation * SizeMatrix;
-
-	// setup matrix
-	glUniformMatrix4fv(ModelNormalID, 1, GL_FALSE, value_ptr(Translation));
-	glUniformMatrix4fv(ModelID, 1, GL_FALSE, value_ptr(FinalModel));
-	// draw cube
-	glDrawArrays(GL_TRIANGLES, CubeStart, CubeSize);
+	DrawCube(Position, mat4(1.0f), Size);
 }
 
 void Render::DrawPickedPoint(void) {
@@ -216,46 +62,17 @@ void Render::DrawPickedPoint(void) {
 
 	if (HavePickedPoint) {
 
-		vec4 DiffuseColor = { 1, 0, 0, 0.7 };
-		vec3 SpecularColor = { 0, 0, 0 };
+		SetWireframeMode(true);
+		SetColors({ 1, 0, 0, 0.7 });
 
-		glUniform4fv(DiffuseColorID, 1, value_ptr(DiffuseColor));
-		glUniform3fv(SpecularColorID, 1, value_ptr(SpecularColor));
+		DrawSphere(PickedPoint, mat4(1.0f), vec3(0.05f));
 
-		mat4 Translation = translate(mat4(1.0f), PickedPoint);
-		mat4 SizeMatrix = scale(mat4(1.0f), vec3(0.05f));
+		vec3 PlanePosition = PlaneNormal * PlaneDistance - cross(cross(PickedPoint, PlaneNormal), PlaneNormal);
 
-		mat4 FinalModel = Translation * SizeMatrix;
+		SetWireframeMode(false);
+		SetColors({ 0, 0, 0.5, 0.5 });
 
-		// setup matrix
-		glUniformMatrix4fv(ModelNormalID, 1, GL_FALSE, value_ptr(Translation));
-		glUniformMatrix4fv(ModelID, 1, GL_FALSE, value_ptr(FinalModel));
-		// draw cube
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glDrawArrays(GL_TRIANGLES, SphereStart, SphereSize);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-		Translation = translate(mat4(1.0f), PlaneNormal * PlaneDistance + (PickedPoint - PlaneNormal * dot(PlaneNormal, PickedPoint)));
-
-		vec3 Axis = cross(PlaneNormal, Up);
-		float Angle = -acos(dot(PlaneNormal, Up));
-		mat4 NormalRotation = rotate(mat4(1.0f), Angle, Axis);
-
-		mat4 FacingRotation = rotate(mat4(1.0f), atan2(PlaneNormal.y, PlaneNormal.x), Up);
-
-		mat4 Rotation = NormalRotation * FacingRotation;
-
-		SizeMatrix = scale(mat4(1.0f), vec3(1.0f));
-
-		mat4 Model = Translation * Rotation;
-		FinalModel = Model * SizeMatrix;
-
-		DiffuseColor = { 0, 0, 0.5, 0.5 };
-		glUniform4fv(DiffuseColorID, 1, value_ptr(DiffuseColor));
-
-		glUniformMatrix4fv(ModelNormalID, 1, GL_FALSE, value_ptr(Model));
-		glUniformMatrix4fv(ModelID, 1, GL_FALSE, value_ptr(FinalModel));
-		glDrawArrays(GL_TRIANGLES, PlaneStart, PlaneSize);
+		DrawPlane(PlanePosition, PlaneNormal, vec3(1.0f));
 	}
 }
 
@@ -344,6 +161,203 @@ void Render::GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& Wo
 	GetPointAndDirectionFromScreenPoint(x, y, Point, Direction);
 
 	return PhysicsManager::GetInstance().GetBoneFromRay(Point, Direction, TouchedBone, WorldPoint, WorldNormal);
+}
+
+// Primitives
+
+void Render::LoadPrimitiveModel(const wchar_t* ModelName, Vertex* Buffer, uint32 BufferSize, uint32 &DestIndex,
+	uint32 &ResultIndex, uint32& ResultSize) {
+
+	wstring FileName = L".\\Models\\" + wstring(ModelName) + L".bin";
+
+	FILE* ModelFile = _wfopen(FileName.c_str(), L"rb");
+
+	uint32 Remaining = BufferSize - DestIndex;
+
+	uint32 Readed = (uint32)fread(Buffer + DestIndex, sizeof(Vertex), Remaining, ModelFile);
+
+	ResultIndex = DestIndex;
+	ResultSize = Readed;
+
+	DestIndex += Readed;
+
+	fclose(ModelFile);
+}
+
+void Render::LoadPrimitiveModels(void) {
+
+	glGenBuffers(1, &BufferName);
+	glBindBuffer(GL_ARRAY_BUFFER, BufferName);
+
+	const int BufferSize = 500;
+	Vertex Buffer[BufferSize];
+
+	uint32 CurrentIndex = 0;
+
+	LoadPrimitiveModel(L"plane", Buffer, BufferSize, CurrentIndex, PlaneStart, PlaneSize);
+	LoadPrimitiveModel(L"cube", Buffer, BufferSize, CurrentIndex, CubeStart, CubeSize);
+	LoadPrimitiveModel(L"sphere", Buffer, BufferSize, CurrentIndex, SphereStart, SphereSize);
+
+	// line
+	LineStart = CurrentIndex;
+	Buffer[CurrentIndex++] = { { -0.5f, 0, 0 },{},{} };
+	Buffer[CurrentIndex++] = { { 0.5f, 0, 0 },{},{} };
+	LineSize = CurrentIndex - LineStart;
+
+	glBufferData(GL_ARRAY_BUFFER, CurrentIndex * sizeof(Vertex), Buffer, GL_STATIC_DRAW);
+}
+
+// Render API
+
+void Render::SetWireframeMode(bool IsWireFrame) {
+
+	if (IsWireFrame)
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	else
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+}
+
+void Render::SetColors(vec4 DiffuseColor, vec3 SpecularColor) {
+
+	glUniform4fv(DiffuseColorID, 1, value_ptr(DiffuseColor));
+	glUniform3fv(SpecularColorID, 1, value_ptr(SpecularColor));
+}
+
+void Render::DrawCube(vec3 Position, mat4 Rotation, vec3 Size) {
+
+	mat4 Model = translate(mat4(1.0f), Position) * Rotation;
+
+	DrawCube(Model, Size);
+}
+
+void Render::DrawCube(mat4 Model, vec3 Size) {
+
+	mat4 FinalModel = Model * scale(mat4(1.0f), Size);
+
+	glUniformMatrix4fv(ModelNormalID, 1, GL_FALSE, value_ptr(Model));
+	glUniformMatrix4fv(ModelID, 1, GL_FALSE, value_ptr(FinalModel));
+	glDrawArrays(GL_TRIANGLES, CubeStart, CubeSize);
+}
+
+void Render::DrawPlane(vec3 Position, vec3 Normal, vec3 Size) {
+
+	vec3 Axis = cross(Normal, Up);
+	float Angle = -acos(dot(Normal, Up));
+	mat4 NormalRotation = rotate(mat4(1.0f), Angle, Axis);
+
+	mat4 FacingRotation = rotate(mat4(1.0f), atan2(Normal.y, Normal.x), Up);
+
+	mat4 Rotation = NormalRotation * FacingRotation;
+
+	mat4 Model = translate(mat4(1.0f), Position) * Rotation;
+	mat4 FinalModel = Model * scale(mat4(1.0f), Size);
+
+	glUniformMatrix4fv(ModelNormalID, 1, GL_FALSE, value_ptr(Model));
+	glUniformMatrix4fv(ModelID, 1, GL_FALSE, value_ptr(FinalModel));
+	glDrawArrays(GL_TRIANGLES, PlaneStart, PlaneSize);
+}
+
+void Render::DrawSphere(vec3 Position, mat4 Rotation, vec3 Size) {
+
+	mat4 Model = translate(Rotation, Position);
+
+	mat4 FinalModel = Model * scale(mat4(1.0f), Size);
+
+	glUniformMatrix4fv(ModelNormalID, 1, GL_FALSE, value_ptr(Model));
+	glUniformMatrix4fv(ModelID, 1, GL_FALSE, value_ptr(FinalModel));
+	glDrawArrays(GL_TRIANGLES, SphereStart, SphereSize);
+}
+
+// OpenGL
+
+#define floatsizeofmember(s, m) (sizeof((((s*)0)->m)) / sizeof(GLfloat))
+
+void Render::Initialize(HWND WindowHandle) {
+
+	PIXELFORMATDESCRIPTOR PixelFormatDesc =
+	{
+		sizeof(PIXELFORMATDESCRIPTOR),
+		1,
+		PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+		PFD_TYPE_RGBA,
+		32,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		24,                   // Number of bits for the depthbuffer
+		8,                    // Number of bits for the stencilbuffer
+		0,                    // Number of Aux buffers in the framebuffer.
+		PFD_MAIN_PLANE,
+		0, 0, 0, 0
+	};
+
+	WindowDC = GetDC(WindowHandle);
+	int PixelFormat = ChoosePixelFormat(WindowDC, &PixelFormatDesc);
+	SetPixelFormat(WindowDC, PixelFormat, &PixelFormatDesc);
+
+	HGLRC hGL = wglCreateContext(WindowDC);
+	if (!wglMakeCurrent(WindowDC, hGL))
+		throw new runtime_error("Couldn't assign DC to OpenGL");
+
+	glewExperimental = true; // Needed for core profile
+	if (glewInit() != GLEW_OK)
+		throw new runtime_error("Couldn't init GLEW");
+
+	glEnable(GL_DEPTH_TEST);
+
+	// Enable blending
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glEnable(GL_CULL_FACE);
+	glFrontFace(GL_CCW);
+
+	// Create and compile our GLSL program from the shaders
+	ShaderID = LoadShaders("TransformVertexShader.vertexshader", "ColorFragmentShader.fragmentshader");
+
+	ProjectionID = glGetUniformLocation(ShaderID, "Projection");
+	ViewID = glGetUniformLocation(ShaderID, "View");
+	ModelID = glGetUniformLocation(ShaderID, "Model");
+	ModelNormalID = glGetUniformLocation(ShaderID, "ModelNormal");
+
+	DiffuseColorID = glGetUniformLocation(ShaderID, "DiffuseColor");
+	SpecularColorID = glGetUniformLocation(ShaderID, "SpecularColor");
+
+	IsLightEnabledID = glGetUniformLocation(ShaderID, "IsLightEnabled");
+	LightPositionID = glGetUniformLocation(ShaderID, "LightPosition");
+	LightDirectionID = glGetUniformLocation(ShaderID, "LightDirection");
+	LightAmbientColorID = glGetUniformLocation(ShaderID, "LightAmbientColor");
+	LightDiffuseColorID = glGetUniformLocation(ShaderID, "LightDiffuseColor");
+	LightPowerID = glGetUniformLocation(ShaderID, "LightPower");
+
+	glUseProgram(ShaderID);
+
+	Projection = perspective(radians(45.0f), AspectRatio, 0.1f, 100.0f);
+	glUniformMatrix4fv(ProjectionID, 1, GL_FALSE, value_ptr(Projection));
+
+	// Camera matrix
+
+	CameraPosition = { 2.5f, -2.5, 1.264f };
+	LookAtPoint({ 0, 0, 0.264f });
+	UpdateViewMatrix();
+
+	LoadPrimitiveModels();
+
+	glClearColor(1, 1, 1, 1);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, floatsizeofmember(Vertex, Position), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Position));
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, floatsizeofmember(Vertex, Normal), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, Normal));
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, floatsizeofmember(Vertex, TexCoord), GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)offsetof(Vertex, TexCoord));
+
+	vec3 LightAmbientColor = { 0.3, 0.3, 0.3 };
+	vec3 LightDiffuseColor = { 1.0, 1.0, 1.0 };
+	float LightPower = 1;
+
+	glUniform1i(IsLightEnabledID, GL_TRUE);
+	glUniform3fv(LightAmbientColorID, 1, value_ptr(LightAmbientColor));
+	glUniform3fv(LightDiffuseColorID, 1, value_ptr(LightDiffuseColor));
+	glUniform1f(LightPowerID, LightPower);
 }
 
 // Matrices Calculations
