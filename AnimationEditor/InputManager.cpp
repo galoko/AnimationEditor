@@ -4,7 +4,8 @@
 
 #include "Character.hpp"
 #include "Render.hpp"
-#include "PhysicsManager.hpp"
+#include "AnimationManager.hpp"
+#include "CharacterManager.hpp"
 
 void InputManager::Initialize(HWND WindowHandle) {
 
@@ -19,11 +20,28 @@ void InputManager::Initialize(HWND WindowHandle) {
 
 	if (!RegisterRawInputDevices(Rid, 1, sizeof(Rid[0])))
 		throw new runtime_error("Couldn't register raw devices");
+
+	// Debug Test
+
+	Character* Char = CharacterManager::GetInstance().GetCharacter();
+	Bone* RightHand = Char->FindBone(L"Chest");
+	vec3 LocalPoint = RightHand->Size * RightHand->Tail;
+
+	vec3 WorldPoint = RightHand->WorldTransform * vec4(LocalPoint, 1);
+	vec3 Direction = rotate(rotate(mat4(1.0f), radians(-45.0f), vec3(0, 1, 0)), radians(90.0f), vec3(0, 0, 1))  * vec4(RightHand->Tail, 0);
+	WorldPoint += Direction * 0.5f;
+
+	HavePickedPoint = true; 
+	PickedPoint = WorldPoint;
+
+	AnimationManager::GetInstance().InverseKinematic(RightHand, LocalPoint, WorldPoint);
 }
 
 void InputManager::Tick(double dt) {
 
 	ProcessKeyboardInput(dt);
+
+	AnimationManager::GetInstance().InverseKinematic(PickedPoint);
 }
 
 void InputManager::SetFocus(bool IsInFocusNow) {
@@ -67,6 +85,7 @@ void InputManager::ProcessMouseLockState(void)
 		}
 	}
 	else if (IsMouseLockEnforced) {
+
 		ShowCursor(true);
 		ClipCursor(NULL);
 
@@ -94,6 +113,7 @@ void InputManager::ProcessMouseInput(LONG dx, LONG dy) {
 
 		PlaneNormal = -Render::GetInstance().GetLookingDirection();
 		PlaneDistance = dot(PlaneNormal, PickedPoint);
+
 		/*
 		if (HavePickedPoint)
 			CorrectPlaneDistance();

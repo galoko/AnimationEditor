@@ -17,6 +17,7 @@ private:
 	bool IsInFocus;
 
 	typedef enum State {
+		NoneMode,
 		InteractionMode,
 		CameraMode
 	} State;

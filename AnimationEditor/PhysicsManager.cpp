@@ -17,7 +17,7 @@ void PhysicsManager::Initialize(void)
 	btSequentialImpulseConstraintSolver* solver = new btSequentialImpulseConstraintSolver;
 
 	World = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
-	World->setGravity(btVector3(0, 0, -9.8));
+	World->setGravity(btVector3(0, 0, 0));
 
 	btOverlapFilterCallback* filterCallback = new YourOwnFilterCallback();
 	World->getPairCache()->setOverlapFilterCallback(filterCallback);
@@ -38,14 +38,11 @@ void PhysicsManager::CreatePhysicsForCharacter(void) {
 
 		float Volume = Bone->Size.x * Bone->Size.y * Bone->Size.z;
 		const float Density = 1900;
-		float Mass = Density * Volume;
-
-		if (Bone->IsLocked)
-			Mass = 0.0f;
+		Bone->Mass = Density * Volume;
 
 		mat4 Transform = Bone->WorldTransform * Bone->MiddleTranslation;
 
-		Bone->PhysicBody = AddDynamicBox(Transform, Bone->Size, Mass);
+		Bone->PhysicBody = AddDynamicBox(Transform, Bone->Size, Bone->Mass);
 		Bone->PhysicBody->setUserPointer((void*)Bone);
 	}
 
@@ -66,6 +63,18 @@ void PhysicsManager::CreatePhysicsForCharacter(void) {
 
 			AddConstraint(Parent, Child, ParentLocalPoint, ChildLocalPoint);
 		}
+}
+
+void PhysicsManager::ChangeObjectMass(btRigidBody* Body, float NewMass)
+{
+	World->removeRigidBody(Body);
+
+	btVector3 Inertia;
+	Body->getCollisionShape()->calculateLocalInertia(NewMass, Inertia);
+	Body->setMassProps(NewMass, Inertia);
+
+	//Add the rigid body to the dynamics world
+	World->addRigidBody(Body);
 }
 
 void PhysicsManager::AddConstraint(Bone* Parent, Bone* Child, vec3 ParentLocalPoint, vec3 ChildLocalPoint)
@@ -190,18 +199,26 @@ void PhysicsManager::CreateFloor(float FloorSize2D, float FloorHeight)
 
 void PhysicsManager::Tick(double dt) {
 
-	// return;
-
 	PhysicsTime += dt;
 
 	uint64 StepCount = (uint64)(PhysicsTime * PHYSICS_FPS);
 
 	// skip steps (especially useful after breakpoint wake up)
+	/*
 	if (DoneStepCount + MaxStepsPerTick < StepCount)
 		DoneStepCount = StepCount - MaxStepsPerTick;
+	*/
 
-	for (; DoneStepCount < StepCount; DoneStepCount++) 
+	for (; DoneStepCount < StepCount; DoneStepCount++) {
+
+		if (PreSolveCallback != nullptr)
+			PreSolveCallback();
+
 		World->stepSimulation(fixed_dt, 0, fixed_dt);
+
+		if (PostSolveCallback != nullptr)
+			PostSolveCallback();
+	}
 
 	SyncCharacterWithWorld();
 }
@@ -211,13 +228,9 @@ void PhysicsManager::SyncCharacterWithWorld(void) {
 	Character* Char = CharacterManager::GetInstance().GetCharacter();
 
 	// apply changes to bones
-	for (Bone* Bone : Char->Bones) {
+	for (Bone* Bone : Char->Bones)
+		Bone->WorldTransform = GetBoneWorldTransform(Bone);
 
-		btTransform BulletTransfrom;
-		Bone->PhysicBody->getMotionState()->getWorldTransform(BulletTransfrom);
-
-		Bone->WorldTransform = BulletToGLM(BulletTransfrom) * inverse(Bone->MiddleTranslation);
-	}
 	Char->UpdateRotationsFromWorldTransforms();
 }
 
@@ -290,6 +303,15 @@ void PhysicsManager::GetBoneFromRay(vec3 RayStart, vec3 RayDirection, Bone*& Tou
 	}
 }
 
+mat4 PhysicsManager::GetBoneWorldTransform(Bone* Bone)
+{
+	btTransform BulletTransfrom;
+	Bone->PhysicBody->getMotionState()->getWorldTransform(BulletTransfrom);
+	mat4 WorldTransform = BulletToGLM(BulletTransfrom) * inverse(Bone->MiddleTranslation);
+
+	return WorldTransform;
+}
+
 // Collision filter
 
 bool PhysicsManager::YourOwnFilterCallback::needBroadphaseCollision(btBroadphaseProxy* proxy0, btBroadphaseProxy* proxy1) const
@@ -318,52 +340,56 @@ bool PhysicsManager::YourOwnFilterCallback::needBroadphaseCollision(btBroadphase
 
 // Bullet <-> GLM conversion utils
 
-mat4 PhysicsManager::BulletToGLM(btTransform t) {
+namespace psm {
 
-	btScalar matrix[16];
+	mat4 BulletToGLM(btTransform t) {
 
-	t.getOpenGLMatrix(matrix);
+		btScalar matrix[16];
 
-	return mat4(
-		matrix[0], matrix[1], matrix[2], matrix[3],
-		matrix[4], matrix[5], matrix[6], matrix[7],
-		matrix[8], matrix[9], matrix[10], matrix[11],
-		matrix[12], matrix[13], matrix[14], matrix[15]);
-}
+		t.getOpenGLMatrix(matrix);
 
-vec3 PhysicsManager::BulletToGLM(btVector3 v) {
+		return mat4(
+			matrix[0], matrix[1], matrix[2], matrix[3],
+			matrix[4], matrix[5], matrix[6], matrix[7],
+			matrix[8], matrix[9], matrix[10], matrix[11],
+			matrix[12], matrix[13], matrix[14], matrix[15]);
+	}
 
-	return vec3(v.getX(), v.getY(), v.getZ());
-}
+	vec3 BulletToGLM(btVector3 v) {
 
-btTransform PhysicsManager::GLMToBullet(mat4 m) {
+		return vec3(v.getX(), v.getY(), v.getZ());
+	}
 
-	btScalar matrix[16];
+	btTransform GLMToBullet(mat4 m) {
 
-	matrix[0] = m[0][0];
-	matrix[1] = m[0][1];
-	matrix[2] = m[0][2];
-	matrix[3] = m[0][3];
-	matrix[4] = m[1][0];
-	matrix[5] = m[1][1];
-	matrix[6] = m[1][2];
-	matrix[7] = m[1][3];
-	matrix[8] = m[2][0];
-	matrix[9] = m[2][1];
-	matrix[10] = m[2][2];
-	matrix[11] = m[2][3];
-	matrix[12] = m[3][0];
-	matrix[13] = m[3][1];
-	matrix[14] = m[3][2];
-	matrix[15] = m[3][3];
+		btScalar matrix[16];
 
-	btTransform Result;
-	Result.setFromOpenGLMatrix(matrix);
+		matrix[0] = m[0][0];
+		matrix[1] = m[0][1];
+		matrix[2] = m[0][2];
+		matrix[3] = m[0][3];
+		matrix[4] = m[1][0];
+		matrix[5] = m[1][1];
+		matrix[6] = m[1][2];
+		matrix[7] = m[1][3];
+		matrix[8] = m[2][0];
+		matrix[9] = m[2][1];
+		matrix[10] = m[2][2];
+		matrix[11] = m[2][3];
+		matrix[12] = m[3][0];
+		matrix[13] = m[3][1];
+		matrix[14] = m[3][2];
+		matrix[15] = m[3][3];
 
-	return Result;
-}
+		btTransform Result;
+		Result.setFromOpenGLMatrix(matrix);
 
-btVector3 PhysicsManager::GLMToBullet(vec3 v) {
+		return Result;
+	}
 
-	return btVector3(v.x, v.y, v.z);
+	btVector3 GLMToBullet(vec3 v) {
+
+		return btVector3(v.x, v.y, v.z);
+	}
+
 }

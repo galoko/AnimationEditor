@@ -6,6 +6,7 @@
 #include "Render.hpp"
 #include "InputManager.hpp"
 #include "PhysicsManager.hpp"
+#include "AnimationManager.hpp"
 
 void OpenConsole(void) {
 
@@ -68,8 +69,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	CharacterManager::GetInstance().Initialize();
 	HWND WindowHandle = Form::GetInstance().Initialize(hInstance);
 	Render::GetInstance().Initialize(WindowHandle);
-	InputManager::GetInstance().Initialize(WindowHandle);
 	PhysicsManager::GetInstance().Initialize();
+	AnimationManager::GetInstance().Initialize();
+	InputManager::GetInstance().Initialize(WindowHandle);
 
 	aegSetOpenGLWindow(WindowHandle);
 

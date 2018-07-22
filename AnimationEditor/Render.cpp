@@ -36,6 +36,7 @@ void Render::DrawScene(void) {
 void Render::DrawCharacter(Character* Char) {
 
 	SetWireframeMode(false);
+	EnableLighting(true);
 	SetColors({ 0.7, 0.7, 0.7, 1 });
 
 	for (Bone* Bone : Char->Bones)
@@ -45,6 +46,7 @@ void Render::DrawCharacter(Character* Char) {
 void Render::DrawFloor(void) {
 
 	SetWireframeMode(false);
+	EnableLighting(true);
 	SetColors({ 0, 0, 0, 1 });
 
 	vec3 Position = PhysicsManager::GetInstance().GetFloorPosition();
@@ -53,7 +55,15 @@ void Render::DrawFloor(void) {
 	DrawCube(Position, mat4(1.0f), Size);
 }
 
+void Render::DrawGrid(void) {
+
+	// const float GridSize = 2.0f;
+	// const float GridSpacing = 
+}
+
 void Render::DrawPickedPoint(void) {
+
+	EnableLighting(false);
 
 	vec3 PickedPoint, PlaneNormal;
 	float PlaneDistance;
@@ -200,8 +210,8 @@ void Render::LoadPrimitiveModels(void) {
 
 	// line
 	LineStart = CurrentIndex;
-	Buffer[CurrentIndex++] = { { -0.5f, 0, 0 },{},{} };
-	Buffer[CurrentIndex++] = { { 0.5f, 0, 0 },{},{} };
+	Buffer[CurrentIndex++] = { {}, {}, {} };
+	Buffer[CurrentIndex++] = { Up, {}, {} };
 	LineSize = CurrentIndex - LineStart;
 
 	glBufferData(GL_ARRAY_BUFFER, CurrentIndex * sizeof(Vertex), Buffer, GL_STATIC_DRAW);
@@ -215,6 +225,11 @@ void Render::SetWireframeMode(bool IsWireFrame) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	else
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+}
+
+void Render::EnableLighting(bool Enabled) {
+
+	glUniform1i(IsLightEnabledID, Enabled ? GL_TRUE : GL_FALSE);
 }
 
 void Render::SetColors(vec4 DiffuseColor, vec3 SpecularColor) {
@@ -259,13 +274,34 @@ void Render::DrawPlane(vec3 Position, vec3 Normal, vec3 Size) {
 
 void Render::DrawSphere(vec3 Position, mat4 Rotation, vec3 Size) {
 
-	mat4 Model = translate(Rotation, Position);
+	mat4 Model = translate(mat4(1.0f), Position) * Rotation;
 
 	mat4 FinalModel = Model * scale(mat4(1.0f), Size);
 
 	glUniformMatrix4fv(ModelNormalID, 1, GL_FALSE, value_ptr(Model));
 	glUniformMatrix4fv(ModelID, 1, GL_FALSE, value_ptr(FinalModel));
 	glDrawArrays(GL_TRIANGLES, SphereStart, SphereSize);
+}
+
+void Render::DrawLine(vec3 Start, vec3 End) {
+
+	mat4 Translation = translate(mat4(1.0f), Start);
+
+	vec3 Delta = End - Start;
+	float Len = length(Delta);
+	vec3 Normal = Delta / Len;
+
+	vec3 Axis = cross(Normal, Up);
+	float Angle = -acos(dot(Normal, Up));
+	mat4 NormalRotation = rotate(mat4(1.0f), Angle, Axis);
+	
+	mat4 Model = Translation * NormalRotation;
+
+	mat4 FinalModel = Model * scale(mat4(1.0f), vec3(Len));
+
+	glUniformMatrix4fv(ModelNormalID, 1, GL_FALSE, value_ptr(Model));
+	glUniformMatrix4fv(ModelID, 1, GL_FALSE, value_ptr(FinalModel));
+	glDrawArrays(GL_LINES, LineStart, LineSize);
 }
 
 // OpenGL
@@ -354,7 +390,6 @@ void Render::Initialize(HWND WindowHandle) {
 	vec3 LightDiffuseColor = { 1.0, 1.0, 1.0 };
 	float LightPower = 1;
 
-	glUniform1i(IsLightEnabledID, GL_TRUE);
 	glUniform3fv(LightAmbientColorID, 1, value_ptr(LightAmbientColor));
 	glUniform3fv(LightDiffuseColorID, 1, value_ptr(LightDiffuseColor));
 	glUniform1f(LightPowerID, LightPower);

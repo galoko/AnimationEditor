@@ -24,6 +24,8 @@ public:
 
 	uint32 Depth;
 
+	float Mass;
+
 	btRigidBody* PhysicBody;
 
 	bool IsLocked;

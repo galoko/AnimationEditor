@@ -2,13 +2,25 @@
 
 #include <windows.h>
 
+#include <functional>
+
 #include <glm/glm.hpp>
 
 #include <btBulletDynamicsCommon.h>
 
 #include "Character.hpp"
 
+namespace psm {
+	mat4 BulletToGLM(btTransform t);
+	vec3 BulletToGLM(btVector3 v);
+
+	btTransform GLMToBullet(mat4 m);
+	btVector3 GLMToBullet(vec3 v);
+}
+
+using namespace std;
 using namespace glm;
+using namespace psm;
 
 typedef class PhysicsManager {
 private:
@@ -57,14 +69,6 @@ private:
 
 	void ApplyGimbalLockFix(vec3& LowLimit, vec3& HighLimit, btTransform& ParentFrame, btTransform& ChildFrame);
 	void AddConstraint(Bone* Parent, Bone* Child, vec3 ParentLocalPoint, vec3 ChildLocalPoint);
-
-	// Conversion Utils
-
-	static mat4 BulletToGLM(btTransform t);
-	static vec3 BulletToGLM(btVector3 v);
-
-	static btTransform GLMToBullet(mat4 m);
-	static btVector3 GLMToBullet(vec3 v);
 public:
 	static PhysicsManager& GetInstance(void) {
 		static PhysicsManager Instance;
@@ -78,8 +82,14 @@ public:
 	void Initialize(void);
 	void Tick(double dt);
 
+	function<void(void)> PreSolveCallback, PostSolveCallback;
+
 	vec3 GetFloorPosition(void);
 	vec3 GetFloorSize(void);
 
+	void ChangeObjectMass(btRigidBody* Body, float NewMass);
+
 	void GetBoneFromRay(vec3 RayStart, vec3 RayDirection, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal);
+
+	static mat4 GetBoneWorldTransform(Bone* Bone);
 } PhysicsManager;

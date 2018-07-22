@@ -4,7 +4,7 @@
 
 #include "Render.hpp"
 #include "InputManager.hpp"
-#include "PhysicsManager.hpp"
+#include "AnimationManager.hpp"
 #include "shader.hpp"
 
 HWND Form::Initialize(HINSTANCE hInstance) {
@@ -42,7 +42,7 @@ void Form::Tick(double dt) {
 
 	InputManager::GetInstance().Tick(dt);
 
-	PhysicsManager::GetInstance().Tick(dt);
+	AnimationManager::GetInstance().Tick(dt);
 
 	// redraw
 	RedrawWindow(WindowHandle, NULL, 0, RDW_INVALIDATE | RDW_UPDATENOW);

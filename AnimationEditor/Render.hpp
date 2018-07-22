@@ -45,15 +45,18 @@ private:
 	void LoadPrimitiveModels(void);
 
 	void SetWireframeMode(bool IsWireFrame);
+	void EnableLighting(bool Enabled);
 	void SetColors(vec4 DiffuseColor, vec3 SpecularColor = { 0, 0, 0 });
 
 	void DrawCube(vec3 Position, mat4 Rotation, vec3 Size);
 	void DrawCube(mat4 Model, vec3 Size);
 	void DrawPlane(vec3 Position, vec3 Normal, vec3 Size);
 	void DrawSphere(vec3 Position, mat4 Rotation, vec3 Size);
+	void DrawLine(vec3 Start, vec3 End);
 
 	void DrawCharacter(Character* Char);
 	void DrawFloor(void);
+	void DrawGrid(void);
 	void DrawPickedPoint(void);
 
 	void UpdateViewMatrix(void);
