@@ -49,9 +49,6 @@ void PhysicsManager::CreatePhysicsForCharacter(void) {
 	for (Bone* Parent : Char->Bones)
 		for (Bone* Child : Parent->Childs) {
 
-			Parent->PhysicBody->setActivationState(DISABLE_DEACTIVATION);
-			Child->PhysicBody->setActivationState(DISABLE_DEACTIVATION);
-
 			vec4 Zero = vec4(0, 0, 0, 1);
 
 			vec3 ChildHead = Child->WorldTransform * Zero;
@@ -258,6 +255,8 @@ btRigidBody* PhysicsManager::AddDynamicBox(mat4 Transform, vec3 Size, float Mass
 	Body->setFriction(1.0);
 	Body->setRestitution(0.0);
 
+	Body->setActivationState(DISABLE_DEACTIVATION);
+
 	World->addRigidBody(Body);
 
 	return Body;
@@ -294,13 +293,48 @@ void PhysicsManager::GetBoneFromRay(vec3 RayStart, vec3 RayDirection, Bone*& Tou
 	if (RayCallback.hasHit()) {
 
 		Bone* Selected = (Bone*)RayCallback.m_collisionObject->getUserPointer();
-		if (Selected != nullptr && Selected != SOLID_ID) {
+		if (Selected != nullptr && Selected != SOLID_ID && Selected != NON_SOLID_ID) {
 
 			TouchedBone = Selected;
 			WorldPoint = BulletToGLM(RayCallback.m_hitPointWorld);
 			WorldNormal = BulletToGLM(RayCallback.m_hitNormalWorld);
 		}
 	}
+}
+
+void PhysicsManager::SetIKConstraint(btRigidBody* Body, vec3 LocalPoint, vec3 WorldPoint)
+{
+	if (IKDestDummy == nullptr)
+		IKDestDummy = AddStaticBox(mat4(1.0f), {});
+
+	if (Body != IKSourceBody) {
+
+		if (IKConstraint != nullptr) {
+			World->removeConstraint(IKConstraint);
+			delete IKConstraint;
+			IKConstraint = nullptr;
+		}
+	}
+
+	IKSourceBody = Body;
+
+	if (IKConstraint == nullptr) {
+
+		if (IKSourceBody == nullptr)
+			return;
+
+		IKConstraint = new btPoint2PointConstraint(*IKDestDummy, *IKSourceBody, GLMToBullet(vec3(0, 0, 0)), GLMToBullet(vec3(0, 0, 0)));
+
+		IKConstraint->setParam(BT_CONSTRAINT_STOP_CFM, 0.5f);
+		IKConstraint->setParam(BT_CONSTRAINT_STOP_ERP, 0.1f);
+
+		World->addConstraint(IKConstraint);
+	}
+
+	IKConstraint->setPivotB(GLMToBullet(LocalPoint));
+
+	mat4 DestTransform = translate(mat4(1.0f), WorldPoint);
+	IKDestDummy->setWorldTransform(GLMToBullet(DestTransform));
 }
 
 mat4 PhysicsManager::GetBoneWorldTransform(Bone* Bone)
@@ -329,6 +363,10 @@ bool PhysicsManager::YourOwnFilterCallback::needBroadphaseCollision(btBroadphase
 	// either one is solid
 	if (Bone0 == PhysicsManager::GetInstance().SOLID_ID || Bone1 == PhysicsManager::GetInstance().SOLID_ID)
 		return true;
+
+	// either one is non solid
+	if (Bone0 == PhysicsManager::GetInstance().NON_SOLID_ID || Bone1 == PhysicsManager::GetInstance().NON_SOLID_ID)
+		return false;
 
 	// if we have parent->child collision - filter it out
 	if (Bone0->Parent == Bone1 || Bone1->Parent == Bone0)

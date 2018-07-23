@@ -37,6 +37,7 @@ private:
 	const int MaxStepsPerTick = 100;
 
 	const void* SOLID_ID = (void*)1;
+	const void* NON_SOLID_ID = (void*)2;
 
 	struct YourOwnFilterCallback : public btOverlapFilterCallback
 	{
@@ -52,6 +53,12 @@ private:
 	// Floor
 
 	vec3 FloorPosition, FloorSize;
+
+	// IK
+
+	btPoint2PointConstraint* IKConstraint;
+	btRigidBody* IKDestDummy;
+	btRigidBody* IKSourceBody;
 
 	// World
 
@@ -90,6 +97,8 @@ public:
 	void ChangeObjectMass(btRigidBody* Body, float NewMass);
 
 	void GetBoneFromRay(vec3 RayStart, vec3 RayDirection, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal);
+
+	void SetIKConstraint(btRigidBody* Body, vec3 LocalPoint, vec3 WorldPoint);
 
 	static mat4 GetBoneWorldTransform(Bone* Bone);
 } PhysicsManager;

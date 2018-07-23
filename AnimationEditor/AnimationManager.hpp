@@ -12,17 +12,7 @@ typedef class AnimationManager {
 private:
 	AnimationManager(void) { };
 
-	struct {
-		
-		int IsActive;
-		Bone* Bone;
-		vec3 LocalPoint, WorldDestPoint;
-
-	} InverseKinematicTask;
-
 	void PhysicsPreSolve(void);
-
-	void SetupInverseKinematicMass(Bone* PickedBone);
 public:
 	static AnimationManager& GetInstance(void) {
 		static AnimationManager Instance;
@@ -37,7 +27,6 @@ public:
 	void Tick(double dt);
 
 	void InverseKinematic(Bone* Bone, vec3 LocalPoint, vec3 WorldDestPoint);
-	void InverseKinematic(vec3 WorldDestPoint);
 	void CancelInverseKinematic(void);
 
 	bool IsBoneBlocked(Bone* Bone);

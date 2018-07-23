@@ -116,7 +116,7 @@ void InputManager::SelectBoneAtScreenPoint(LONG x, LONG y) {
 	if (SelectedBone != nullptr) {
 
 		Selection.Bone = SelectedBone;
-		Selection.LocalPoint = inverse(SelectedBone->WorldTransform) * vec4(WorldPoint, 1);
+		Selection.LocalPoint = inverse(SelectedBone->WorldTransform * SelectedBone->MiddleTranslation) * vec4(WorldPoint, 1);
 		Selection.WorldPoint = WorldPoint;
 	}
 }
