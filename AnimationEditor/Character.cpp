@@ -9,16 +9,16 @@ Character::Character(void)
 	GenerateBones();
 	UpdateWorldTranforms();
 	UpdateFloorZ();
-	SaveInitialPositions();
 }
 
-Bone* Character::GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, vec3 LowLimit, vec3 HighLimit, wstring Name)
+Bone* Character::GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, vec3 LowLimit, vec3 HighLimit, vec3 LogicalDirection, wstring Name)
 {
 	float CmToMeters = 0.01f;
 
 	Bone* Result = new Bone(NextBoneID++, Name, Offset, Tail, Size * CmToMeters, 
 		vec3(radians(LowLimit.x), radians(LowLimit.y), radians(LowLimit.z)),
 		vec3(radians(HighLimit.x), radians(HighLimit.y), radians(HighLimit.z)),
+		LogicalDirection,
 		Parent);
 
 	Bones.push_back(Result);
@@ -54,7 +54,7 @@ void Character::GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 Mirror
 
 	Bone* RightBone = new Bone(NextBoneID++, LeftBone->Name + L" Right", 
 		LeftBone->Offset * MirrorVector, LeftBone->Tail * MirrorVector, LeftBone->Size,
-		LowLimit, HighLimit, RightParent);
+		LowLimit, HighLimit, LeftBone->LogicalDirection * MirrorVector, RightParent);
 
 	Bones.push_back(RightBone);
 
@@ -66,42 +66,53 @@ void Character::GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 Mirror
 
 void Character::GenerateBones(void)
 {
-	Pelvis = GenerateBone(nullptr, { 0, 0, 1.0f }, { 6.5f, 13.0f, 17.6f }, {}, {}, {}, L"Pelvis");
+	Pelvis = GenerateBone(nullptr, { 0, 0, 1.0f }, { 6.5f, 13.0f, 17.6f }, {}, {}, {}, { 1, 0, 0 }, L"Pelvis");
+
 	Bone* Stomach = GenerateBone(Pelvis, { 0, 0, 1.0f }, { 6.5f, 13.0f, 17.6f }, { 0, 0, 1 }, 
 		{    0,  -70,  -10 }, 
-		{    0,    5,   10 }, L"Stomach");
+		{    0,    5,   10 },
+		{ 1, 0, 0 }, L"Stomach");
 	Bone* Chest = GenerateBone(Stomach, { 0, 0, 1.0f }, { 6.5f, 13.0f, 17.6f }, { 0, 0, 1 }, 
 		{    0,  -70,  -10 }, 
-		{    0,   10,   10 }, L"Chest");
+		{    0,   10,   10 }, 
+		{ 1, 0, 0 }, L"Chest");
 
 	Bone* Neck = GenerateBone(Chest, { 0, 0, 1, }, { 3.0f, 3.0f, 15.0f }, { 0, 0, 1 }, 
 		{    0,  -70,    0 }, 
-		{    0,   35,    0 }, L"Neck");
+		{    0,   35,    0 }, 
+		{ 1, 0, 0 }, L"Neck");
 	Bone* Head = GenerateBone(Neck, { 0, 0, 0, }, { 15.0f, 15.0f, 20.0f }, { 0, 0, 1 }, 
 		{  -30,  -30,  -80 }, 
-		{   30,   10,   80 }, L"Head");
+		{   30,   10,   80 }, 
+		{ 1, 0, 0 }, L"Head");
 
 	Bone* UpperLeg = GenerateBone(Pelvis, { 0, 0, -1.0f }, { 6.5f, 6.5f, 46.0f }, { 0, 0.5f, 0 }, 
 		{  -70,  -20,  -90 }, 
-		{   30,  130,   90 }, L"Upper Leg");
+		{   30,  130,   90 }, 
+		{ 1, 0, 0 }, L"Upper Leg");
 	Bone* LowerLeg = GenerateBone(UpperLeg, { 0, 0, -1.0f }, { 6.49f, 6.49f, 45.0f }, { 0, 0, -1 }, 
 		{    0, -165,    0 }, 
-		{    0,    0,    0 }, L"Lower Leg");
+		{    0,    0,    0 }, 
+		{ 1, 0, 0 }, L"Lower Leg");
 	Bone* Foot = GenerateBone(LowerLeg, { 15.5f / 22.0f, 0, 0 }, { 22.0f, 8.0f, 3.0f }, { 0, 0, -1.175f }, 
 		{  -25,  -70,   -5 }, 
-		{   25,   30,    5 }, L"Foot");
+		{   25,   30,    5 }, 
+		{ 0, 0, 1 }, L"Foot");
 
 	GenerateRightSide(UpperLeg, UpperLeg->Parent, { 0, 1, 0 });
 
 	Bone* UpperArm = GenerateBone(Chest, { 0, 1, 0, }, { 4.5f, 32.0f, 4.5f }, { 0, 0.5f, 1 },
 		{  -65,  -80,  -45 }, 
-		{  110,   80,  110 }, L"Upper Arm");
+		{  110,   80,  110 }, 
+		{ 1, 0, 0 }, L"Upper Arm");
 	Bone* LowerArm = GenerateBone(UpperArm, { 0, 1, 0, }, { 4.49f, 28.0f, 4.49f }, { 0, 1, 0 }, 
 		{    0,    0,    0 }, 
-		{    0,    0,  165 }, L"Lower Arm");
+		{    0,    0,  165 }, 
+		{ 0, 0, 1 }, L"Lower Arm");
 	Bone* Hand = GenerateBone(LowerArm, { 0, 1, 0, }, { 3.5f, 15.0f, 1.5f }, { 0, 1, 0 }, 
 		{  -70,  -90,  -35 }, 
-		{   80,   45,   35 }, L"Hand");
+		{   80,   45,   35 }, 
+		{ 0, 0, -1 }, L"Hand");
 
 	GenerateRightSide(UpperArm, UpperArm->Parent, { 0, 1, 0 });
 }
@@ -140,30 +151,9 @@ Bone* Character::FindBone(const wstring Name)
 	return nullptr;
 }
 
-void Character::LockEverythingBut(vector<wstring> BoneNames)
-{
-	for (Bone* Bone : Bones) {
-		
-		bool IsInUnlockList = false;
-		for (const wstring Name : BoneNames) 
-			if (Bone->Name.find(Name) != -1) {
-				IsInUnlockList = true;
-				break;
-			}
-
-		Bone->IsLocked = !IsInUnlockList;
-	}
-}
-
-void Character::SaveInitialPositions(void)
-{
-	for (Bone* Bone : Bones)
-		Bone->SaveInitialPosition();
-}
-
 // Bone
 
-Bone::Bone(uint32 ID, wstring Name, vec3 Offset, vec3 Tail, vec3 Size, vec3 LowLimit, vec3 HighLimit, Bone* Parent)
+Bone::Bone(uint32 ID, wstring Name, vec3 Offset, vec3 Tail, vec3 Size, vec3 LowLimit, vec3 HighLimit, vec3 LogicalDirection, Bone* Parent)
 {
 	this->ID = ID;
 	this->Name = Name;
@@ -177,6 +167,8 @@ Bone::Bone(uint32 ID, wstring Name, vec3 Offset, vec3 Tail, vec3 Size, vec3 LowL
 
 	this->Rotation = mat4(1.0f);
 	this->MiddleTranslation = translate(mat4(1.0f), this->Tail * this->Size * 0.5f);
+
+	this->LogicalDirection = LogicalDirection;
 
 	this->Parent = Parent;
 	if (Parent != nullptr) {
@@ -213,11 +205,6 @@ vec3 Bone::UpdateRotationFromWorldTransform(mat4 ParentWorldRotation)
 		Child->UpdateRotationFromWorldTransform(Rotation);
 
 	return Translation;
-}
-
-void Bone::SaveInitialPosition(void)
-{
-	InitialPosition = WorldTransform * MiddleTranslation * vec4(0, 0, 0, 1);
 }
 
 bool Bone::IsFixed(void)

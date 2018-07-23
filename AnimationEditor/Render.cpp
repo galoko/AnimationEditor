@@ -43,6 +43,22 @@ void Render::DrawCharacter(Character* Char) {
 
 	for (Bone* Bone : Char->Bones)
 		DrawCube(Bone->WorldTransform * Bone->MiddleTranslation, Bone->Size);
+
+	EnableLighting(false);
+	SetColors({ 0, 0.7, 0, 1 });
+
+	for (Bone* Bone : Char->Bones) {
+
+		mat4 World = Bone->WorldTransform * Bone->MiddleTranslation;
+
+		vec3 LocalBoneCenter = Bone->LogicalDirection * (dot(Bone->LogicalDirection, Bone->Size) * 0.5f);
+		vec3 LocalDirectionEnd = LocalBoneCenter + Bone->LogicalDirection * 0.125f;
+
+		vec3 WorldBoneCenter = World * vec4(LocalBoneCenter, 1);
+		vec3 WorldDirectionEnd = World * vec4(LocalDirectionEnd, 1);
+
+		DrawLine(WorldBoneCenter, WorldDirectionEnd);
+	}
 }
 
 void Render::DrawFloor(void) {

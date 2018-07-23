@@ -40,4 +40,15 @@ public:
 	void InverseKinematic(vec3 WorldDestPoint);
 	void CancelInverseKinematic(void);
 
+	bool IsBoneBlocked(Bone* Bone);
+	void BlockBone(Bone* Bone);
+	void UnblockBone(Bone* Bone);
+
+	void BlockBoneParentsRecursive(Bone* Bone);
+	void UnblockAllBones(void);
+
+	void ConstraintBonePosition(Bone* Bone, vec3 WorldPoint);
+	void FixBoneRotation(Bone* Bone);
+	void RemoveBoneConstraints(Bone* Bone);
+
 } AnimationManager;

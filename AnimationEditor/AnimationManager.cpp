@@ -5,6 +5,15 @@
 
 using namespace psm;
 
+typedef struct AnimationManagerInfo {
+
+	bool IsBlocked;
+
+	btPoint2PointConstraint* PositionConstraint;
+	btGeneric6DofConstraint* RotationConstraint;
+
+} AnimationManagerInfo;
+
 void AnimationManager::Initialize(void) {
 
 	PhysicsManager::GetInstance().PreSolveCallback = bind(&AnimationManager::PhysicsPreSolve, this);
@@ -22,7 +31,8 @@ void AnimationManager::SetupInverseKinematicMass(Bone* PickedBone) {
 	for (Bone* Bone : Char->Bones) {
 		
 		// float NewMass = Bone->Mass * (Bone == PickedBone ? 1 : (Bone->IsLocked ? 0 : 0.01f));
-		float NewMass = Bone->Mass * (Bone == PickedBone ? 1 : (Bone->IsLocked ? 0 : 1));
+		// float NewMass = Bone->Mass * (Bone == PickedBone ? 1 : (Bone->IsLocked ? 0 : 1));
+		float NewMass = Bone->Mass;
 
 		PhysicsManager::GetInstance().ChangeObjectMass(Bone->PhysicBody, NewMass);
 	}
@@ -47,6 +57,11 @@ void AnimationManager::InverseKinematic(vec3 WorldDestPoint) {
 void AnimationManager::CancelInverseKinematic(void)
 {
 	InverseKinematicTask.IsActive = false;
+}
+
+bool AnimationManager::IsBoneBlocked(Bone* Bone)
+{
+	return false;
 }
 
 void AnimationManager::PhysicsPreSolve(void) {

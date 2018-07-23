@@ -162,6 +162,8 @@ vec3 InputManager::GetPlaneNormal(void)
 		return { 0, 1, 0 };
 	case PlaneZ:
 		return { 0, 0, 1 };
+	default:
+		return { 0, 0, 0 };
 	}
 }
 
