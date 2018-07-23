@@ -4,7 +4,22 @@
 
 #include <glm/glm.hpp>
 
+#include "Character.hpp"
+
 using namespace glm;
+
+typedef enum InputState {
+	None,
+	InverseKinematic,
+	BoneRotation
+} InputState;
+
+typedef struct InputSelection {
+	Bone* Bone;
+	vec3 LocalPoint, WorldPoint;
+
+	bool HaveBone(void);
+} InputSelection;
 
 typedef class InputManager {
 private:
@@ -16,23 +31,24 @@ private:
 	LONG MouseX, MouseY;
 	bool IsInFocus;
 
-	typedef enum State {
-		NoneMode,
-		InteractionMode,
-		CameraMode
-	} State;
+	InputState State;
+	bool IsMouseLockEnforced, IsCameraMode;
 
-	State State;
-	bool IsMouseLockEnforced;
+	enum {
+		PlaneCamera,
+		PlaneX,
+		PlaneY,
+		PlaneZ
+	} PlaneMode;
 
-	bool HavePickedPoint;
-	vec3 PickedPoint, PlaneNormal;
-	float PlaneDistance;
+	InputSelection Selection;
 
-	vec3 SavedCameraPosition;
+	bool IsInteractionMode(void);
+	void SelectBoneAtScreenPoint(LONG x, LONG y);
+	void CancelSelection(void);
+	void ProcessCameraMovement(double dt);
 
-	void CorrectPlaneDistance(void);
-	void SyncPickedPointWithScreenCoord(LONG x, LONG y);
+	void SetWorldPointToScreePoint(LONG x, LONG y);
 
 	// Internal processing
 	void ProcessMouseLockState(void);
@@ -58,7 +74,9 @@ public:
 	void Tick(double dt);
 	void SetFocus(bool IsInFocusNow);
 
-	bool GetPickedPoint(vec3& PickedPoint, vec3& PlaneNormal, float& PlaneDistance);
+	InputState GetState(void);
+	InputSelection GetSelection(void);
+	vec3 GetPlaneNormal(void);
 
 	void ProcessMouseInput(LONG dx, LONG dy);	
 	void ProcessMouseFormEvent(LONG x, LONG y);

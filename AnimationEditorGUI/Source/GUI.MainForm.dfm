@@ -11,6 +11,7 @@ object AnimationEditorForm: TAnimationEditorForm
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
+  KeyPreview = True
   OldCreateOrder = False
   Position = poDesigned
   PixelsPerInch = 96
@@ -67,5 +68,10 @@ object AnimationEditorForm: TAnimationEditorForm
     ParentBackground = False
     ParentCtl3D = False
     TabOrder = 3
+  end
+  object ApplicationEvents: TApplicationEvents
+    OnMessage = ApplicationEventsMessage
+    Left = 224
+    Top = 264
   end
 end

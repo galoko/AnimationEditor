@@ -53,11 +53,12 @@ private:
 	void DrawPlane(vec3 Position, vec3 Normal, vec3 Size);
 	void DrawSphere(vec3 Position, mat4 Rotation, vec3 Size);
 	void DrawLine(vec3 Start, vec3 End);
+	void DrawGrid(vec3 Position, float Size, float Spacing);
 
 	void DrawCharacter(Character* Char);
 	void DrawFloor(void);
-	void DrawGrid(void);
 	void DrawPickedPoint(void);
+	void DrawCharacterGrid(void);
 
 	void UpdateViewMatrix(void);
 public:

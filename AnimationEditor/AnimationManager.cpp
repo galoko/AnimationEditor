@@ -21,7 +21,8 @@ void AnimationManager::SetupInverseKinematicMass(Bone* PickedBone) {
 
 	for (Bone* Bone : Char->Bones) {
 		
-		float NewMass = Bone->Mass * (Bone == PickedBone ? 1 : 0.01f);
+		// float NewMass = Bone->Mass * (Bone == PickedBone ? 1 : (Bone->IsLocked ? 0 : 0.01f));
+		float NewMass = Bone->Mass * (Bone == PickedBone ? 1 : (Bone->IsLocked ? 0 : 1));
 
 		PhysicsManager::GetInstance().ChangeObjectMass(Bone->PhysicBody, NewMass);
 	}
@@ -37,12 +38,15 @@ void AnimationManager::InverseKinematic(Bone* Bone, vec3 LocalPoint, vec3 WorldD
 	InverseKinematic(WorldDestPoint);
 }
 
-const float dist_tolerance = 0.01f;
-
 void AnimationManager::InverseKinematic(vec3 WorldDestPoint) {
 
 	InverseKinematicTask.WorldDestPoint = WorldDestPoint;
 	InverseKinematicTask.IsActive = true;
+}
+
+void AnimationManager::CancelInverseKinematic(void)
+{
+	InverseKinematicTask.IsActive = false;
 }
 
 void AnimationManager::PhysicsPreSolve(void) {
@@ -64,13 +68,14 @@ void AnimationManager::PhysicsPreSolve(void) {
 
 		vec3 Delta = InverseKinematicTask.WorldDestPoint - WorldBonePoint;
 
+		const float dist_tolerance = 0.01f;
 		float dist = length(Delta);
 		if (dist <= dist_tolerance)
 			InverseKinematicTask.IsActive = false;
 
 		if (InverseKinematicTask.IsActive && Bone == InverseKinematicTask.Bone) {
 
-			float new_dist = min(max(dist_tolerance * 2.0f, dist), 5.0f);
+			float new_dist = min(max(dist_tolerance * 2.0f, dist), 1.0f);
 
 			vec3 Force = Delta * (new_dist / dist) * 10000.0f / (float)Body->getInvMass();
 			

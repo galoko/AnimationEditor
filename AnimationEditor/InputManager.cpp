@@ -2,7 +2,6 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "Character.hpp"
 #include "Render.hpp"
 #include "AnimationManager.hpp"
 #include "CharacterManager.hpp"
@@ -20,28 +19,14 @@ void InputManager::Initialize(HWND WindowHandle) {
 
 	if (!RegisterRawInputDevices(Rid, 1, sizeof(Rid[0])))
 		throw new runtime_error("Couldn't register raw devices");
-
-	// Debug Test
-
-	Character* Char = CharacterManager::GetInstance().GetCharacter();
-	Bone* RightHand = Char->FindBone(L"Chest");
-	vec3 LocalPoint = RightHand->Size * RightHand->Tail;
-
-	vec3 WorldPoint = RightHand->WorldTransform * vec4(LocalPoint, 1);
-	vec3 Direction = rotate(rotate(mat4(1.0f), radians(-45.0f), vec3(0, 1, 0)), radians(90.0f), vec3(0, 0, 1))  * vec4(RightHand->Tail, 0);
-	WorldPoint += Direction * 0.5f;
-
-	HavePickedPoint = true; 
-	PickedPoint = WorldPoint;
-
-	AnimationManager::GetInstance().InverseKinematic(RightHand, LocalPoint, WorldPoint);
 }
 
 void InputManager::Tick(double dt) {
 
 	ProcessKeyboardInput(dt);
 
-	AnimationManager::GetInstance().InverseKinematic(PickedPoint);
+	if (State == InverseKinematic && Selection.HaveBone())
+		AnimationManager::GetInstance().InverseKinematic(Selection.Bone, Selection.LocalPoint, Selection.WorldPoint);
 }
 
 void InputManager::SetFocus(bool IsInFocusNow) {
@@ -54,24 +39,19 @@ void InputManager::SetFocus(bool IsInFocusNow) {
 	}
 }
 
-bool InputManager::GetPickedPoint(vec3& PickedPoint, vec3& PlaneNormal, float& PlaneDistance)
+InputState InputManager::GetState(void)
 {
-	if (HavePickedPoint) {
+	return State;
+}
 
-		PickedPoint = this->PickedPoint;
-		PlaneNormal = this->PlaneNormal;
-		PlaneDistance = this->PlaneDistance;
-
-		return true;
-	}
-	else {
-		return false;
-	}
+InputSelection InputManager::GetSelection(void)
+{
+	return Selection;
 }
 
 void InputManager::ProcessMouseLockState(void)
 {
-	if (State == CameraMode && IsInFocus) {
+	if (IsCameraMode && IsInFocus) {
 
 		POINT CursorPoint;
 		if (!IsMouseLockEnforced && GetCursorPos(&CursorPoint)) {
@@ -91,10 +71,10 @@ void InputManager::ProcessMouseLockState(void)
 
 		IsMouseLockEnforced = false;
 
-		if (HavePickedPoint) {
+		if (State == InverseKinematic && Selection.HaveBone()) {
 
 			LONG x, y;
-			Render::GetInstance().GetScreenPointFromPoint(PickedPoint, x, y);
+			Render::GetInstance().GetScreenPointFromPoint(Selection.WorldPoint, x, y);
 
 			POINT ScreenPoint = { x, y };
 			ClientToScreen(WindowHandle, &ScreenPoint);
@@ -106,48 +86,99 @@ void InputManager::ProcessMouseLockState(void)
 
 void InputManager::ProcessMouseInput(LONG dx, LONG dy) {
 
-	if (State == CameraMode && IsInFocus) {
+	if (IsCameraMode && IsInFocus) {
 
 		const float Speed = 1.0f / 300;
 		Render::GetInstance().RotateCamera((float)dx * Speed, (float)dy * Speed);
-
-		PlaneNormal = -Render::GetInstance().GetLookingDirection();
-		PlaneDistance = dot(PlaneNormal, PickedPoint);
-
-		/*
-		if (HavePickedPoint)
-			CorrectPlaneDistance();
-		*/
 	}
 }
 
-void InputManager::CorrectPlaneDistance(void) {
-
-	vec3 CameraPosition = Render::GetInstance().GetCameraPosition();
-
-	float OldDistancePlaneToCamera = dot(CameraPosition, PlaneNormal) - PlaneDistance;
-
-	PlaneNormal = -Render::GetInstance().GetLookingDirection();
-
-	vec3 NewPlaneCenter = CameraPosition - PlaneNormal * OldDistancePlaneToCamera;
-
-	PlaneDistance = dot(NewPlaneCenter, PlaneNormal);
-
-	SyncPickedPointWithScreenCoord(MouseX, MouseY);
+bool InputManager::IsInteractionMode(void)
+{
+	return !IsCameraMode;
 }
 
-void InputManager::SyncPickedPointWithScreenCoord(LONG x, LONG y) {
+void InputManager::SelectBoneAtScreenPoint(LONG x, LONG y) {
+
+	if (Selection.HaveBone()) {
+
+		CancelSelection();
+
+		if (State != None) 
+			return;
+	}
+
+	Bone* SelectedBone;
+	vec3 WorldPoint, WorldNormal;
+
+	Render::GetInstance().GetBoneFromScreenPoint(MouseX, MouseY, SelectedBone, WorldPoint, WorldNormal);
+
+	if (SelectedBone != nullptr) {
+
+		Selection.Bone = SelectedBone;
+		Selection.LocalPoint = inverse(SelectedBone->WorldTransform) * vec4(WorldPoint, 1);
+		Selection.WorldPoint = WorldPoint;
+	}
+}
+
+void InputManager::CancelSelection(void) {
+
+	Selection.Bone = nullptr;
+
+	if (State == InverseKinematic)
+		AnimationManager::GetInstance().CancelInverseKinematic();
+}
+
+void InputManager::ProcessCameraMovement(double dt)
+{
+	const float Speed = 1.0f;
+
+	vec3 Offset = {};
+	vec3 Direction = Render::GetInstance().GetLookingDirection();
+	vec3 SideDirection = cross(Direction, Render::GetInstance().Up);
+	vec3 ForwardDirection = cross(Render::GetInstance().Up, SideDirection);
+
+	if (IsPressed('W'))
+		Offset += ForwardDirection;
+	if (IsPressed('S'))
+		Offset -= ForwardDirection;
+	if (IsPressed('D'))
+		Offset += SideDirection;
+	if (IsPressed('A'))
+		Offset -= SideDirection;
+
+	if (length(Offset) > 0)
+		Render::GetInstance().MoveCamera(normalize(Offset) * Speed * (float)dt);
+}
+
+vec3 InputManager::GetPlaneNormal(void)
+{	
+	switch (PlaneMode) {
+	case PlaneCamera:
+		return -Render::GetInstance().GetLookingDirection();
+	case PlaneX:
+		return { 1, 0, 0 };
+	case PlaneY:
+		return { 0, 1, 0 };
+	case PlaneZ:
+		return { 0, 0, 1 };
+	}
+}
+
+void InputManager::SetWorldPointToScreePoint(LONG x, LONG y) {
 
 	vec3 Point, Direction;
 	Render::GetInstance().GetPointAndDirectionFromScreenPoint(x, y, Point, Direction);
 
-	float c = dot(Direction, PlaneNormal);
-	if (c < 0) {
+	vec3 PlaneNormal = GetPlaneNormal();
 
-		float t = -(dot(Point, PlaneNormal) - PlaneDistance) / c;
+	float c = dot(Direction, PlaneNormal);
+	if (fabs(c) > 10e-7) {
+
+		float t = -(dot(Point, PlaneNormal) - dot(Selection.WorldPoint, PlaneNormal)) / c;
 		vec3 P = Point + t * Direction;
 
-		PickedPoint = P;
+		Selection.WorldPoint = P;
 	}
 }
 
@@ -155,59 +186,39 @@ void InputManager::ProcessKeyboardInput(double dt) {
 
 	if (WasPressed(VK_RBUTTON)) {
 
-		SavedCameraPosition = Render::GetInstance().GetCameraPosition();
-
-		State = CameraMode;
+		IsCameraMode = true;
 		ProcessMouseLockState();
 	}
 	else
 	if (WasUnpressed(VK_RBUTTON)) {
 
-		State = InteractionMode;
+		IsCameraMode = false;
 		ProcessMouseLockState();
 	}
 
-	if (WasPressed(VK_LBUTTON) && State == InteractionMode) {
+	if (WasPressed(VK_LBUTTON) && IsInteractionMode()) 
+		SelectBoneAtScreenPoint(MouseX, MouseY);
 
-		Bone* SelectedBone;
-		vec3 WorldPoint, WorldNormal;
-
-		Render::GetInstance().GetBoneFromScreenPoint(MouseX, MouseY, SelectedBone, WorldPoint, WorldNormal);
-
-		if (SelectedBone != nullptr) {
-			PickedPoint = WorldPoint;
-			HavePickedPoint = true;
-
-			PlaneNormal = -Render::GetInstance().GetLookingDirection();
-			PlaneDistance = dot(PlaneNormal, PickedPoint);
-		}
-		else {
-			HavePickedPoint = false;
-		}
+	if (WasPressed(VK_ESCAPE)) {
+		CancelSelection();
+		State = None;
 	}
 
-	if (State == CameraMode) {
-		const float Speed = 10.0f;
-		vec3 Offset = {};
-		vec3 Direction = Render::GetInstance().GetLookingDirection();
-		vec3 SideDirection = cross(Direction, Render::GetInstance().Up);
-		vec3 ForwardDirection = cross(Render::GetInstance().Up, SideDirection);
+	if (WasPressed('Q') && State == None)
+		State = InverseKinematic;
 
-		if (IsPressed('W'))
-			Offset += ForwardDirection;
-		if (IsPressed('S'))
-			Offset -= ForwardDirection;
-		if (IsPressed('D'))
-			Offset += SideDirection;
-		if (IsPressed('A'))
-			Offset -= SideDirection;
+	if (WasPressed('Z'))
+		PlaneMode = PlaneZ;
+	if (WasPressed('X'))
+		PlaneMode = PlaneX;
+	if (WasPressed('C'))
+		PlaneMode = PlaneY;
+	if (WasPressed('V'))
+		PlaneMode = PlaneCamera;
 
-		if (dot(Offset, Offset) > 0) {
+	ProcessCameraMovement(dt);
 
-			Render::GetInstance().MoveCamera(normalize(Offset) * Speed * (float)dt);
-		}
-	}
-
+	// erase previous state
 	memcpy(LastKeyboardState, CurrentKeyboardState, sizeof(LastKeyboardState));
 }
 
@@ -215,13 +226,12 @@ void InputManager::ProcessMouseFormEvent(LONG x, LONG y) {
 
 	MouseX = x;
 	MouseY = y;
+
+	if (State == None && IsPressed(VK_LBUTTON))
+		SelectBoneAtScreenPoint(MouseX, MouseY);
 	
-	if (HavePickedPoint && State == InteractionMode) {
-
-		PlaneNormal = -Render::GetInstance().GetLookingDirection();
-
-		SyncPickedPointWithScreenCoord(MouseX, MouseY);
-	}
+	if (State == InverseKinematic && Selection.HaveBone())
+		SetWorldPointToScreePoint(MouseX, MouseY);
 }
 
 void InputManager::ProcessKeyboardEvent(void) {
@@ -257,4 +267,11 @@ void InputManager::UpdateKeyboardState(void)
 {
 	GetKeyState(0);
 	GetKeyboardState(CurrentKeyboardState);
+}
+
+// InputSelection
+
+bool InputSelection::HaveBone(void)
+{
+	return Bone != nullptr;
 }

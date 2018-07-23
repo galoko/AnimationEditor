@@ -14,7 +14,7 @@ private:
 
 	struct {
 		
-		bool IsActive;
+		int IsActive;
 		Bone* Bone;
 		vec3 LocalPoint, WorldDestPoint;
 
@@ -38,5 +38,6 @@ public:
 
 	void InverseKinematic(Bone* Bone, vec3 LocalPoint, vec3 WorldDestPoint);
 	void InverseKinematic(vec3 WorldDestPoint);
+	void CancelInverseKinematic(void);
 
 } AnimationManager;

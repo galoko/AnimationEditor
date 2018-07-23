@@ -27,6 +27,8 @@ void Render::DrawScene(void) {
 	Character* Char = CharacterManager::GetInstance().GetCharacter();
 	DrawCharacter(Char);
 
+	// DrawCharacterGrid();
+
 	DrawPickedPoint();
 
 	glFlush();
@@ -55,35 +57,38 @@ void Render::DrawFloor(void) {
 	DrawCube(Position, mat4(1.0f), Size);
 }
 
-void Render::DrawGrid(void) {
-
-	// const float GridSize = 2.0f;
-	// const float GridSpacing = 
-}
-
 void Render::DrawPickedPoint(void) {
+
+	InputState State = InputManager::GetInstance().GetState();
+	InputSelection Selection = InputManager::GetInstance().GetSelection();
+
+	if (Selection.Bone == nullptr)
+		return;
 
 	EnableLighting(false);
 
-	vec3 PickedPoint, PlaneNormal;
-	float PlaneDistance;
-	
-	bool HavePickedPoint = InputManager::GetInstance().GetPickedPoint(PickedPoint, PlaneNormal, PlaneDistance);
+	SetWireframeMode(true);
+	SetColors({ 1, 0, 0, 0.7 });
 
-	if (HavePickedPoint) {
+	DrawSphere(Selection.WorldPoint, mat4(1.0f), vec3(0.05f));
 
-		SetWireframeMode(true);
-		SetColors({ 1, 0, 0, 0.7 });
+	if (State == InverseKinematic) {
 
-		DrawSphere(PickedPoint, mat4(1.0f), vec3(0.05f));
-
-		vec3 PlanePosition = PlaneNormal * PlaneDistance - cross(cross(PickedPoint, PlaneNormal), PlaneNormal);
+		vec3 PlaneNormal = InputManager::GetInstance().GetPlaneNormal();
 
 		SetWireframeMode(false);
 		SetColors({ 0, 0, 0.5, 0.5 });
 
-		DrawPlane(PlanePosition, PlaneNormal, vec3(1.0f));
+		DrawPlane(Selection.WorldPoint, PlaneNormal, vec3(1.0f));
 	}
+}
+
+void Render::DrawCharacterGrid(void) {
+
+	SetWireframeMode(false);
+	EnableLighting(false);
+	SetColors({ 0, 0.7, 0, 0.5 });
+	DrawGrid({}, 2, 0.5f);
 }
 
 // Controls API
@@ -257,8 +262,13 @@ void Render::DrawCube(mat4 Model, vec3 Size) {
 void Render::DrawPlane(vec3 Position, vec3 Normal, vec3 Size) {
 
 	vec3 Axis = cross(Normal, Up);
-	float Angle = -acos(dot(Normal, Up));
-	mat4 NormalRotation = rotate(mat4(1.0f), Angle, Axis);
+	mat4 NormalRotation;
+	if (length(Axis) > 0) {
+		float Angle = -acos(dot(Normal, Up));
+		NormalRotation = rotate(mat4(1.0f), Angle, Axis);
+	}
+	else
+		NormalRotation = mat4(1.0f);
 
 	mat4 FacingRotation = rotate(mat4(1.0f), atan2(Normal.y, Normal.x), Up);
 
@@ -291,17 +301,56 @@ void Render::DrawLine(vec3 Start, vec3 End) {
 	float Len = length(Delta);
 	vec3 Normal = Delta / Len;
 
+	mat4 Model = Translation;
+
 	vec3 Axis = cross(Normal, Up);
+	if (length(Axis) < 10e-10)
+		Axis = { 1, 0, 0 };
+
 	float Angle = -acos(dot(Normal, Up));
 	mat4 NormalRotation = rotate(mat4(1.0f), Angle, Axis);
-	
-	mat4 Model = Translation * NormalRotation;
+
+	Model = Model * NormalRotation;
 
 	mat4 FinalModel = Model * scale(mat4(1.0f), vec3(Len));
 
 	glUniformMatrix4fv(ModelNormalID, 1, GL_FALSE, value_ptr(Model));
 	glUniformMatrix4fv(ModelID, 1, GL_FALSE, value_ptr(FinalModel));
 	glDrawArrays(GL_LINES, LineStart, LineSize);
+}
+
+vec3 ShiftVector(vec3 v) {
+	return vec3(v.z, v.x, v.y);
+}
+
+void Render::DrawGrid(vec3 Position, float Size, float Spacing) {
+
+	const vec3 Normals[3] = { { 1, 0, 0 },{ 0, 1, 0 },{ 0, 0, 1 } };
+
+	int LinesCount = (int)(Size / Spacing);
+
+	for (vec3 Normal : Normals) {
+
+		vec3 Up = ShiftVector(Normal);
+		vec3 Side = ShiftVector(Up);
+
+		for (int X = 0; X < LinesCount; X++) {
+
+			float tx = (float)X / (LinesCount - 1) - 0.5f;
+			vec3 UpPart = Up * vec3(tx * Size);
+
+			for (int Y = 0; Y < LinesCount; Y++) {
+
+				float ty = (float)Y / (LinesCount - 1) - 0.5f;
+
+				vec3 SidePart = Side * vec3(ty * Size);
+
+				vec3 v = SidePart + UpPart;
+
+				DrawLine(v + Normal * (Size * 0.5f), v + Normal * (-Size * 0.5f));
+			}
+		}
+	}
 }
 
 // OpenGL
@@ -343,8 +392,10 @@ void Render::Initialize(HWND WindowHandle) {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+	/*
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CCW);
+	*/
 
 	// Create and compile our GLSL program from the shaders
 	ShaderID = LoadShaders("TransformVertexShader.vertexshader", "ColorFragmentShader.fragmentshader");

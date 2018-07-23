@@ -3,7 +3,7 @@
 void CharacterManager::Initialize(void) {
 
 	Char = new Character();
-	// Char->FindBone(L"Hand Left")->IsLocked = true;
+	Char->FindBone(L"Chest")->IsLocked = true;
 }
 
 Character* CharacterManager::GetCharacter(void) {
