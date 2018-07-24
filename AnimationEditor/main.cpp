@@ -73,8 +73,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	AnimationManager::GetInstance().Initialize();
 	InputManager::GetInstance().Initialize(WindowHandle);
 
-	aegSetOpenGLWindow(WindowHandle);
-
 	LastTick = GetTime();
 	aegRun();
 

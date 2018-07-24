@@ -64,9 +64,6 @@ private:
 
 	btDiscreteDynamicsWorld* World;
 
-	btRigidBody* AddDynamicBox(mat4 Transform, vec3 Size, float Mass);
-	btRigidBody* AddStaticBox(mat4 Transform, vec3 Size);
-
 	// Tick Utils
 
 	void SyncCharacterWithWorld(void);
@@ -99,6 +96,12 @@ public:
 	void GetBoneFromRay(vec3 RayStart, vec3 RayDirection, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal);
 
 	void SetIKConstraint(btRigidBody* Body, vec3 LocalPoint, vec3 WorldPoint);
+
+	btDiscreteDynamicsWorld* GetWorld(void);
+
+	btRigidBody* AddDynamicBox(mat4 Transform, vec3 Size, float Mass);
+	btRigidBody* AddStaticBox(mat4 Transform, vec3 Size);
+	btRigidBody* AddStaticNonSolidBox(mat4 Transform, vec3 Size);
 
 	static mat4 GetBoneWorldTransform(Bone* Bone);
 } PhysicsManager;

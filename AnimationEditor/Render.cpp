@@ -14,6 +14,7 @@
 
 #include "PhysicsManager.hpp"
 #include "InputManager.hpp"
+#include "AnimationManager.hpp"
 #include "CharacterManager.hpp"
 #include "shader.hpp"
 
@@ -39,10 +40,25 @@ void Render::DrawCharacter(Character* Char) {
 
 	SetWireframeMode(false);
 	EnableLighting(true);
-	SetColors({ 0.7, 0.7, 0.7, 1 });
 
-	for (Bone* Bone : Char->Bones)
+	InputSelection Selection = InputManager::GetInstance().GetSelection();
+
+	for (Bone* Bone : Char->Bones) {
+
+		vec4 Color;
+
+		if (Bone == Selection.Bone)
+			Color = { 255 / 255.0f, 163 / 255.0f, 0, 1 };
+		else 
+			Color = { 0.7, 0.7, 0.7, 1 };
+
+		if (AnimationManager::GetInstance().GetBoneBlocking(Bone).IsFullyBlocked())
+			Color = vec4(vec3(Color) * 0.36f, 1);
+	
+		SetColors(Color);
+
 		DrawCube(Bone->WorldTransform * Bone->MiddleTranslation, Bone->Size);
+	}
 
 	EnableLighting(false);
 	SetColors({ 0, 0.7, 0, 1 });

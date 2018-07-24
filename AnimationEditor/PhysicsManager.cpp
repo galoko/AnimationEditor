@@ -267,6 +267,13 @@ btRigidBody* PhysicsManager::AddStaticBox(mat4 Transform, vec3 Size)
 	return AddDynamicBox(Transform, Size, 0.0f);
 }
 
+btRigidBody* PhysicsManager::AddStaticNonSolidBox(mat4 Transform, vec3 Size)
+{
+	btRigidBody* Body = AddStaticBox(Transform, Size);
+	Body->setUserPointer((void*)NON_SOLID_ID);
+	return Body;
+}
+
 vec3 PhysicsManager::GetFloorPosition(void)
 {
 	return FloorPosition;
@@ -305,7 +312,7 @@ void PhysicsManager::GetBoneFromRay(vec3 RayStart, vec3 RayDirection, Bone*& Tou
 void PhysicsManager::SetIKConstraint(btRigidBody* Body, vec3 LocalPoint, vec3 WorldPoint)
 {
 	if (IKDestDummy == nullptr)
-		IKDestDummy = AddStaticBox(mat4(1.0f), {});
+		IKDestDummy = AddStaticNonSolidBox(mat4(1.0f), {});
 
 	if (Body != IKSourceBody) {
 
@@ -335,6 +342,11 @@ void PhysicsManager::SetIKConstraint(btRigidBody* Body, vec3 LocalPoint, vec3 Wo
 
 	mat4 DestTransform = translate(mat4(1.0f), WorldPoint);
 	IKDestDummy->setWorldTransform(GLMToBullet(DestTransform));
+}
+
+btDiscreteDynamicsWorld* PhysicsManager::GetWorld(void)
+{
+	return World;
 }
 
 mat4 PhysicsManager::GetBoneWorldTransform(Bone* Bone)

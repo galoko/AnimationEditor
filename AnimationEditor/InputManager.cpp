@@ -5,6 +5,7 @@
 #include "Render.hpp"
 #include "AnimationManager.hpp"
 #include "CharacterManager.hpp"
+#include "Form.hpp"
 
 void InputManager::Initialize(HWND WindowHandle) {
 
@@ -71,16 +72,8 @@ void InputManager::ProcessMouseLockState(void)
 
 		IsMouseLockEnforced = false;
 
-		if (State == InverseKinematic && Selection.HaveBone()) {
-
-			LONG x, y;
-			Render::GetInstance().GetScreenPointFromPoint(Selection.WorldPoint, x, y);
-
-			POINT ScreenPoint = { x, y };
-			ClientToScreen(WindowHandle, &ScreenPoint);
-
-			SetCursorPos(ScreenPoint.x, ScreenPoint.y);
-		}
+		if (State == InverseKinematic && Selection.HaveBone()) 
+			SetCursorToWorldPoint(Selection.WorldPoint);
 	}
 }
 
@@ -100,6 +93,8 @@ bool InputManager::IsInteractionMode(void)
 
 void InputManager::SelectBoneAtScreenPoint(LONG x, LONG y) {
 
+	Form::UpdateLock Lock;
+
 	if (Selection.HaveBone()) {
 
 		CancelSelection();
@@ -118,6 +113,8 @@ void InputManager::SelectBoneAtScreenPoint(LONG x, LONG y) {
 		Selection.Bone = SelectedBone;
 		Selection.LocalPoint = inverse(SelectedBone->WorldTransform * SelectedBone->MiddleTranslation) * vec4(WorldPoint, 1);
 		Selection.WorldPoint = WorldPoint;
+
+		Form::GetInstance().UpdateBlocking();
 	}
 }
 
@@ -127,6 +124,8 @@ void InputManager::CancelSelection(void) {
 
 	if (State == InverseKinematic)
 		AnimationManager::GetInstance().CancelInverseKinematic();
+
+	Form::GetInstance().UpdateBlocking();
 }
 
 void InputManager::ProcessCameraMovement(double dt)
@@ -184,6 +183,17 @@ void InputManager::SetWorldPointToScreePoint(LONG x, LONG y) {
 	}
 }
 
+void InputManager::SetCursorToWorldPoint(vec3 WorldPoint)
+{
+	LONG x, y;
+	Render::GetInstance().GetScreenPointFromPoint(Selection.WorldPoint, x, y);
+
+	POINT ScreenPoint = { x, y };
+	ClientToScreen(WindowHandle, &ScreenPoint);
+
+	SetCursorPos(ScreenPoint.x, ScreenPoint.y);
+}
+
 void InputManager::ProcessKeyboardInput(double dt) {
 
 	if (WasPressed(VK_RBUTTON)) {
@@ -202,12 +212,47 @@ void InputManager::ProcessKeyboardInput(double dt) {
 		SelectBoneAtScreenPoint(MouseX, MouseY);
 
 	if (WasPressed(VK_ESCAPE)) {
-		CancelSelection();
-		State = None;
+
+		if (State == None)
+			CancelSelection();
+		else
+			State = None;
 	}
 
-	if (WasPressed('Q') && State == None)
+	if (WasPressed('Q') && State == None) {
+		SetCursorToWorldPoint(Selection.WorldPoint);
 		State = InverseKinematic;
+	}
+
+	if (WasPressed('R') && Selection.HaveBone()) {
+
+		if (IsPressed(VK_LCONTROL))
+			AnimationManager::GetInstance().BlockEverythingExceptThisBranch(Selection.Bone->Parent, Selection.Bone);
+		else {
+
+			BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
+			if (Blocking.IsFullyBlocked())
+				Blocking = BlockingInfo::GetAllUnblocked();
+			else
+				Blocking = BlockingInfo::GetAllBlocked();
+
+			AnimationManager::GetInstance().SetBoneBlocking(Selection.Bone, Blocking);
+		}
+	}
+
+	if (WasPressed('P'))
+		AnimationManager::GetInstance().UnblockAllBones();
+
+	if (WasPressed('K') && Selection.HaveBone()) {
+
+		BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
+		
+		Blocking.XAxis = false;
+		Blocking.YAxis = false;
+		Blocking.ZAxis = false;
+
+		AnimationManager::GetInstance().SetBoneBlocking(Selection.Bone, Blocking);
+	}
 
 	if (WasPressed('Z'))
 		PlaneMode = PlaneZ;

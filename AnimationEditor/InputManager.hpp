@@ -49,6 +49,7 @@ private:
 	void ProcessCameraMovement(double dt);
 
 	void SetWorldPointToScreePoint(LONG x, LONG y);
+	void SetCursorToWorldPoint(vec3 WorldPoint);
 
 	// Internal processing
 	void ProcessMouseLockState(void);

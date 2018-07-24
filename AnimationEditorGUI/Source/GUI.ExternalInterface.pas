@@ -5,26 +5,35 @@ interface
 uses
   Winapi.Windows,
   Vcl.Forms,
-  Utils.FPUState,
-  GUI.MainForm;
+  Utils.FPUState;
 
 type
   TButtonCallback = procedure (const Name: PWideChar); stdcall;
+  TCheckBoxCallback = procedure (const Name: PWideChar; IsChecked: Boolean); stdcall;
   TIdleCallback = procedure; stdcall;
 
 procedure aegInitialize; stdcall;
 procedure aegSetIdleCallback(Callback: TIdleCallback); stdcall;
 procedure aegSetOpenGLWindow(Window: HWND); stdcall;
-procedure aegSetButtonCallback(const Name: PWideChar; Callback: TButtonCallback); stdcall;
+procedure aegSetButtonCallback(Callback: TButtonCallback); stdcall;
+procedure aegSetCheckBoxCallback(Callback: TCheckBoxCallback); stdcall;
+procedure aegSetEnabled(const Name: PWideChar; IsEnabled: Boolean); stdcall;
+procedure aegSetChecked(const Name: PWideChar; IsChecked: Boolean); stdcall;
 procedure aegRun; stdcall;
 
 implementation
+
+uses
+  GUI.MainForm;
 
 exports
   aegInitialize,
   aegSetIdleCallback,
   aegSetOpenGLWindow,
   aegSetButtonCallback,
+  aegSetCheckBoxCallback,
+  aegSetEnabled,
+  aegSetChecked,
   aegRun;
 
 type
@@ -52,9 +61,24 @@ begin
   AnimationEditorForm.SetOpenGLWindow(Window);
 end;
 
-procedure aegSetButtonCallback(const Name: PWideChar; Callback: TButtonCallback); stdcall;
+procedure aegSetButtonCallback(Callback: TButtonCallback);
 begin
-  // TODO
+  AnimationEditorForm.SetButtonCallback(Callback);
+end;
+
+procedure aegSetCheckBoxCallback(Callback: TCheckBoxCallback);
+begin
+  AnimationEditorForm.SetCheckBoxCallback(Callback);
+end;
+
+procedure aegSetEnabled(const Name: PWideChar; IsEnabled: Boolean);
+begin
+  AnimationEditorForm.SetEnabled(Name, IsEnabled);
+end;
+
+procedure aegSetChecked(const Name: PWideChar; IsChecked: Boolean);
+begin
+  AnimationEditorForm.SetChecked(Name, IsChecked);
 end;
 
 procedure aegRun; stdcall;

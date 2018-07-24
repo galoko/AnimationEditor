@@ -32,7 +32,7 @@ public:
 
 	btRigidBody* PhysicBody;
 
-	AnimationManagerInfo* AnimationManagerInfo;
+	AnimationManagerInfo* AnimInfo;
 
 	bool IsFixed(void);
 	bool IsOnlyXRotation(void);

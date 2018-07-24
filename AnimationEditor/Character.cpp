@@ -80,7 +80,7 @@ void Character::GenerateBones(void)
 	Bone* Neck = GenerateBone(Chest, { 0, 0, 1, }, { 3.0f, 3.0f, 15.0f }, { 0, 0, 1 }, 
 		{    0,  -70,    0 }, 
 		{    0,   35,    0 }, 
-		{ 1, 0, 0 }, L"Neck");
+		{ 0, 0, 0 }, L"Neck");
 	Bone* Head = GenerateBone(Neck, { 0, 0, 0, }, { 15.0f, 15.0f, 20.0f }, { 0, 0, 1 }, 
 		{  -30,  -30,  -80 }, 
 		{   30,   10,   80 }, 

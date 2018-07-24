@@ -5,7 +5,14 @@
 #include "Render.hpp"
 #include "InputManager.hpp"
 #include "AnimationManager.hpp"
+#include "ExternalGUI.hpp"
 #include "shader.hpp"
+
+#define CheckFormUpdateBlock(PendingFlag) \
+	if (UpdateBlockCounter != 0) { \
+		PendingFlag = true; \
+		return; \
+	}
 
 HWND Form::Initialize(HINSTANCE hInstance) {
 
@@ -31,6 +38,12 @@ HWND Form::Initialize(HINSTANCE hInstance) {
 	WindowHandle = CreateWindowW(WindowClass, Title, WS_POPUP, WindowPos.x, WindowPos.y, Width, Height, nullptr, nullptr, hInstance, nullptr);
 	if (WindowHandle == 0)
 		throw new runtime_error("Couldn't create window");
+
+	aegSetOpenGLWindow(WindowHandle);
+	aegSetButtonCallback(ButtonStaticCallback);
+	aegSetCheckBoxCallback(CheckBoxStaticCallback);
+
+	SetupDefaultValues();
 
 	return WindowHandle;
 }
@@ -134,4 +147,110 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
+}
+
+void Form::ButtonStaticCallback(const wchar_t * Name)
+{
+	Form::GetInstance().ButtonCallback(Name);
+}
+
+void Form::ButtonCallback(const wstring Name)
+{
+	if (Name == CONSTRAIN_POSITION) {
+
+		InputSelection Selection = InputManager::GetInstance().GetSelection();
+
+		if (Selection.HaveBone())
+			if (!AnimationManager::GetInstance().IsBonePositionConstrained(Selection.Bone))
+				AnimationManager::GetInstance().ConstrainBonePosition(Selection.Bone, Selection.WorldPoint);
+			else
+				AnimationManager::GetInstance().RemoveBonePositionConstraint(Selection.Bone);
+	}
+}
+
+void Form::CheckBoxStaticCallback(const wchar_t* Name, bool IsChecked)
+{
+	Form::GetInstance().CheckBoxCallback(Name, IsChecked);
+}
+
+void Form::CheckBoxCallback(const wstring Name, bool IsChecked)
+{
+	Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
+	BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Bone);
+
+	if (Name == X_POS)
+		Blocking.XPos = IsChecked;
+	else
+	if (Name == Y_POS)
+		Blocking.YPos = IsChecked;
+	else
+	if (Name == Z_POS)
+		Blocking.ZPos = IsChecked;
+	else
+	if (Name == X_AXIS)
+		Blocking.XAxis = IsChecked;
+	else
+	if (Name == Y_AXIS)
+		Blocking.YAxis = IsChecked;
+	else
+	if (Name == Z_AXIS)
+		Blocking.ZAxis = IsChecked;
+
+	if (Bone != nullptr)
+		AnimationManager::GetInstance().SetBoneBlocking(Bone, Blocking);
+}
+
+void Form::SetupDefaultValues(void)
+{	
+	aegSetEnabled(CONSTRAIN_POSITION, false);
+	aegSetEnabled(X_POS,  false);
+	aegSetEnabled(Y_POS,  false);
+	aegSetEnabled(Z_POS,  false);
+	aegSetEnabled(X_AXIS, false);
+	aegSetEnabled(Y_AXIS, false);
+	aegSetEnabled(Z_AXIS, false);
+
+	aegSetChecked(X_POS,  true);
+	aegSetChecked(Y_POS,  true);
+	aegSetChecked(Z_POS,  true);
+	aegSetChecked(X_AXIS, true);
+	aegSetChecked(Y_AXIS, true);
+	aegSetChecked(Z_AXIS, true);
+}
+
+void Form::UpdateBlocking(void)
+{
+	CheckFormUpdateBlock(IsBlockingUpdatePending);
+
+	InputSelection Selection = InputManager::GetInstance().GetSelection();
+	if (!Selection.HaveBone()) {
+		SetupDefaultValues();
+		return;
+	}
+
+	aegSetEnabled(CONSTRAIN_POSITION, true);
+
+	aegSetEnabled(X_POS,  true);
+	aegSetEnabled(Y_POS,  true);
+	aegSetEnabled(Z_POS,  true);
+	aegSetEnabled(X_AXIS, true);
+	aegSetEnabled(Y_AXIS, true);
+	aegSetEnabled(Z_AXIS, true);
+
+	BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
+
+	aegSetChecked(X_POS,  Blocking.XPos);
+	aegSetChecked(Y_POS,  Blocking.YPos);
+	aegSetChecked(Z_POS,  Blocking.ZPos);
+	aegSetChecked(X_AXIS, Blocking.XAxis);
+	aegSetChecked(Y_AXIS, Blocking.YAxis);
+	aegSetChecked(Z_AXIS, Blocking.ZAxis);
+}
+
+void Form::ProcessPendingUpdates(void)
+{
+	if (IsBlockingUpdatePending) {
+		IsBlockingUpdatePending = false;
+		UpdateBlocking();
+	}
 }

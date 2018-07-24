@@ -8,6 +8,25 @@
 
 using namespace glm;
 
+typedef struct BlockingInfo {
+
+	bool XAxis, YAxis, ZAxis, XPos, YPos, ZPos;
+
+	bool IsFullyBlocked(void);
+
+	static BlockingInfo GetAllBlocked(void);
+	static BlockingInfo GetAllUnblocked(void);
+} BlockingInfo;
+
+typedef struct AnimationManagerInfo {
+
+	btPoint2PointConstraint* PositionConstraint;
+	btRigidBody* ConstraintDummy;
+
+	BlockingInfo Blocking;
+
+} AnimationManagerInfo;
+
 typedef class AnimationManager {
 private:
 	AnimationManager(void) { };
@@ -29,15 +48,13 @@ public:
 	void InverseKinematic(Bone* Bone, vec3 LocalPoint, vec3 WorldDestPoint);
 	void CancelInverseKinematic(void);
 
-	bool IsBoneBlocked(Bone* Bone);
-	void BlockBone(Bone* Bone);
-	void UnblockBone(Bone* Bone);
+	BlockingInfo GetBoneBlocking(Bone* Bone);
+	void SetBoneBlocking(Bone* Bone, BlockingInfo Blocking);
 
-	void BlockBoneParentsRecursive(Bone* Bone);
+	bool IsBonePositionConstrained(Bone* Bone);
+	void ConstrainBonePosition(Bone* Bone, vec3 WorldPoint);
+	void RemoveBonePositionConstraint(Bone* Bone);
+
+	void BlockEverythingExceptThisBranch(Bone* Parent, Bone* Exception);
 	void UnblockAllBones(void);
-
-	void ConstraintBonePosition(Bone* Bone, vec3 WorldPoint);
-	void FixBoneRotation(Bone* Bone);
-	void RemoveBoneConstraints(Bone* Bone);
-
 } AnimationManager;
