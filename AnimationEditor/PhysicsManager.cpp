@@ -270,6 +270,14 @@ vec3 PhysicsManager::GetBoneAngles(Bone* Bone)
 
 void PhysicsManager::SetBoneAngles(Bone* Bone, vec3 Angles)
 {
+	bool SavedXAxisBlocked, SavedYAxisBlocked, SavedZAxisBlocked;
+
+	SavedXAxisBlocked = Bone->XAxisBlocked;
+	SavedYAxisBlocked = Bone->YAxisBlocked;
+	SavedZAxisBlocked = Bone->ZAxisBlocked;
+
+	UpdateBoneConstraint(Bone, false, false, false);
+
 	Angles = clamp(Angles, Bone->LowLimit, Bone->HighLimit);
 
 	mat4 RotationX, RotationY, RotationZ;
@@ -305,6 +313,8 @@ void PhysicsManager::SetBoneAngles(Bone* Bone, vec3 Angles)
 		Bone->Rotation = RotationZ * RotationY * RotationX;
 
 	SyncWorldWithCharacter();
+
+	UpdateBoneConstraint(Bone, SavedXAxisBlocked, SavedYAxisBlocked, SavedZAxisBlocked);
 }
 
 PhysicsManager::GimbalLockFixType PhysicsManager::GetGimbalLockFixType(vec3 LowLimit, vec3 HighLimit)
