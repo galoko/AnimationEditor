@@ -46,20 +46,8 @@ void PhysicsManager::CreatePhysicsForCharacter(void) {
 		Bone->PhysicBody->setUserPointer((void*)Bone);
 	}
 
-	for (Bone* Parent : Char->Bones)
-		for (Bone* Child : Parent->Childs) {
-
-			vec4 Zero = vec4(0, 0, 0, 1);
-
-			vec3 ChildHead = Child->WorldTransform * Zero;
-			vec3 ChildPosition = Child->WorldTransform * Child->MiddleTranslation * Zero;
-			vec3 ParentPosition = Parent->WorldTransform * Parent->MiddleTranslation * Zero;
-
-			vec3 ChildLocalPoint = ChildHead - ChildPosition;
-			vec3 ParentLocalPoint = ChildHead - ParentPosition;
-
-			AddConstraint(Parent, Child, ParentLocalPoint, ChildLocalPoint);
-		}
+	for (Bone* Child : Char->Bones)
+		UpdateBoneConstraint(Child, false, false, false);
 }
 
 void PhysicsManager::ChangeObjectMass(btRigidBody* Body, float NewMass)
@@ -74,10 +62,17 @@ void PhysicsManager::ChangeObjectMass(btRigidBody* Body, float NewMass)
 	World->addRigidBody(Body);
 }
 
-void PhysicsManager::AddConstraint(Bone* Parent, Bone* Child, vec3 ParentLocalPoint, vec3 ChildLocalPoint)
+void PhysicsManager::UpdateBoneConstraint(Bone* Child, bool XAxisBlocked, bool YAxisBlocked, bool ZAxisBlocked)
 {
-	btVector3 BulletChildLocalPoint = GLMToBullet(ChildLocalPoint);
-	btVector3 BulletParentLocalPoint = GLMToBullet(ParentLocalPoint);
+	Bone* Parent = Child->Parent;
+	if (Parent == nullptr) {
+
+		Child->PhysicBody->setAngularFactor(GLMToBullet({ XAxisBlocked ? 0 : 1, YAxisBlocked ? 0 : 1, ZAxisBlocked ? 0 : 1 }));
+		return;
+	}
+
+	btVector3 BulletChildLocalPoint = GLMToBullet(Child->JointLocalPoint);
+	btVector3 BulletParentLocalPoint = GLMToBullet(Child->ParentJointLocalPoint);
 
 	btTransform BulletChildFrame;
 	BulletChildFrame.setIdentity();
@@ -92,53 +87,227 @@ void PhysicsManager::AddConstraint(Bone* Parent, Bone* Child, vec3 ParentLocalPo
 
 	if (Child->IsFixed()) {
 
-		btFixedConstraint* Constraint = new btFixedConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
-		World->addConstraint(Constraint, true);
+		if (Child->PhysicConstraint == nullptr) {
+
+			btFixedConstraint* Constraint = new btFixedConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
+
+			Child->PhysicConstraint = Constraint;
+			World->addConstraint(Child->PhysicConstraint, true);
+		}
 	}
 	else
 	if (Child->IsOnlyXRotation())
 	{
-		btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
-			btVector3(1, 0, 0), btVector3(1, 0, 0));
-		Constraint->setLimit(LowLimit.x, HighLimit.x);
-		World->addConstraint(Constraint, true);
+		btHingeConstraint* Constraint;
+		
+		if (Child->PhysicConstraint == nullptr) {
+			Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
+				btVector3(1, 0, 0), btVector3(1, 0, 0));
+
+			Child->PhysicConstraint = Constraint;
+			World->addConstraint(Child->PhysicConstraint, true);
+		}
+		else
+			Constraint = (btHingeConstraint*)Child->PhysicConstraint;
+
+		if (XAxisBlocked) {
+
+			btScalar Angle = Constraint->getHingeAngle();
+
+			Constraint->setLimit(Angle, Angle);
+		}
+		else
+			Constraint->setLimit(LowLimit.x, HighLimit.x);
 	}
 	else
 	if (Child->IsOnlyYRotation())
 	{
-		btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
-			btVector3(0, 1, 0), btVector3(0, 1, 0));
-		Constraint->setLimit(LowLimit.y, HighLimit.y);
-		World->addConstraint(Constraint, true);
+		btHingeConstraint* Constraint;
+		
+		if (Child->PhysicConstraint == nullptr) {
+
+			Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
+				btVector3(0, 1, 0), btVector3(0, 1, 0));
+			
+			Child->PhysicConstraint = Constraint;
+			World->addConstraint(Child->PhysicConstraint, true);
+		}
+		else
+			Constraint = (btHingeConstraint*)Child->PhysicConstraint;
+		
+		if (YAxisBlocked) {
+
+			btScalar Angle = Constraint->getHingeAngle();
+
+			Constraint->setLimit(Angle, Angle);
+		}
+		else
+			Constraint->setLimit(LowLimit.y, HighLimit.y);
 	}
 	else
 	if (Child->IsOnlyZRotation())
 	{
-		btHingeConstraint* Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
-			btVector3(0, 0, 1), btVector3(0, 0, 1));
-		Constraint->setLimit(LowLimit.z, HighLimit.z);
-		World->addConstraint(Constraint, true);
+		btHingeConstraint* Constraint;
+		
+		if (Child->PhysicConstraint == nullptr) {
+
+			Constraint = new btHingeConstraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentLocalPoint, BulletChildLocalPoint,
+				btVector3(0, 0, 1), btVector3(0, 0, 1));
+
+			Child->PhysicConstraint = Constraint;
+			World->addConstraint(Child->PhysicConstraint, true);
+		}
+		else
+			Constraint = (btHingeConstraint*)Child->PhysicConstraint;
+
+		if (ZAxisBlocked) {
+
+			btScalar Angle = Constraint->getHingeAngle();
+
+			Constraint->setLimit(Angle, Angle);
+		}
+		else
+			Constraint->setLimit(LowLimit.z, HighLimit.z);
 	}
 	else
 	// generic 6DOF 
 	{
-		ApplyGimbalLockFix(LowLimit, HighLimit, BulletParentFrame, BulletChildFrame);
+		ApplyGimbalLockFix(LowLimit, HighLimit, BulletParentFrame, BulletChildFrame, XAxisBlocked, YAxisBlocked, ZAxisBlocked);
 
-		btGeneric6DofSpring2Constraint* Constraint =
-			new btGeneric6DofSpring2Constraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
-		Constraint->setLinearLowerLimit(btVector3(0, 0, 0));
-		Constraint->setLinearUpperLimit(btVector3(0, 0, 0));
+		btGeneric6DofSpring2Constraint* Constraint;
 
-		Constraint->setAngularLowerLimit(btVector3(LowLimit.x, LowLimit.y, LowLimit.z));
-		Constraint->setAngularUpperLimit(btVector3(HighLimit.x, HighLimit.y, HighLimit.z));
+		if (Child->PhysicConstraint == nullptr) {
 
-		for (int i = 0; i < 6; i++)
-			Constraint->setStiffness(i, 0);
-		World->addConstraint(Constraint, true);
+			Constraint = new btGeneric6DofSpring2Constraint(*Parent->PhysicBody, *Child->PhysicBody, BulletParentFrame, BulletChildFrame);
+
+			Constraint->setLinearLowerLimit(btVector3(0, 0, 0));
+			Constraint->setLinearUpperLimit(btVector3(0, 0, 0));
+
+			for (int i = 0; i < 6; i++)
+				Constraint->setStiffness(i, 0);
+
+			Child->PhysicConstraint = Constraint;
+			World->addConstraint(Child->PhysicConstraint, true);
+		}
+		else
+			Constraint = (btGeneric6DofSpring2Constraint*)Child->PhysicConstraint;
+
+		if (XAxisBlocked || YAxisBlocked || ZAxisBlocked) {
+
+			Constraint->calculateTransforms();
+
+			vec3 CurrentAngles = { Constraint->getAngle(0), Constraint->getAngle(1), Constraint->getAngle(2) };
+
+			if (XAxisBlocked) {
+				LowLimit.x = CurrentAngles.x;
+				HighLimit.x = CurrentAngles.x;
+			}
+
+			if (YAxisBlocked) {
+				LowLimit.y = CurrentAngles.y;
+				HighLimit.y = CurrentAngles.y;
+			}
+
+			if (ZAxisBlocked) {
+				LowLimit.z = CurrentAngles.z;
+				HighLimit.z = CurrentAngles.z;
+			}
+		}
+
+		Constraint->setAngularLowerLimit(GLMToBullet(LowLimit));
+		Constraint->setAngularUpperLimit(GLMToBullet(HighLimit));
 	}
 }
 
-void PhysicsManager::ApplyGimbalLockFix(vec3& LowLimit, vec3& HighLimit, btTransform& ParentFrame, btTransform& ChildFrame)
+vec3 PhysicsManager::GetBoneAngles(Bone* Bone)
+{
+	float NaN = nanf("");
+
+	if (Bone->PhysicConstraint == nullptr) {
+
+		quat Q = quat_cast(Bone->Rotation);
+		vec3 angles = -eulerAngles(Q);
+
+		return angles;
+	}
+
+	if (Bone->IsFixed())
+		return vec3(NaN); // ?
+	else 
+	if (Bone->IsOnlyXRotation()) {
+
+		btHingeConstraint* Constraint = (btHingeConstraint*)Bone->PhysicConstraint;
+
+		return { Constraint->getHingeAngle(), NaN, NaN };
+	}
+	else
+	if (Bone->IsOnlyYRotation()) {
+
+		btHingeConstraint* Constraint = (btHingeConstraint*)Bone->PhysicConstraint;
+
+		return { NaN, Constraint->getHingeAngle(), NaN };
+	}
+	else
+	if (Bone->IsOnlyZRotation()) {
+
+		btHingeConstraint* Constraint = (btHingeConstraint*)Bone->PhysicConstraint;
+
+		return { NaN, NaN, Constraint->getHingeAngle() };
+	}
+	else {
+
+		btGeneric6DofSpring2Constraint* Constraint = (btGeneric6DofSpring2Constraint*)Bone->PhysicConstraint;
+
+		Constraint->calculateTransforms();
+
+		vec3 CurrentAngles = { Constraint->getAngle(0), Constraint->getAngle(1), Constraint->getAngle(2) };
+
+		ReverseGimbalLockFix(Bone->LowLimit, Bone->HighLimit, CurrentAngles);
+
+		return CurrentAngles;
+	}
+}
+
+void PhysicsManager::SetBoneAngles(Bone* Bone, vec3 Angles)
+{
+	Angles = clamp(Angles, Bone->LowLimit, Bone->HighLimit);
+
+	mat4 RotationX, RotationY, RotationZ;
+
+	if (!isnan(Angles.x))
+		RotationX = rotate(mat4(1.0f), Angles.x, vec3(-1, 0, 0));
+	else
+		RotationX = mat4(1.0f);
+
+	if (!isnan(Angles.y))
+		RotationY = rotate(mat4(1.0f), Angles.y, vec3(0, -1, 0));
+	else
+		RotationY = mat4(1.0f);
+
+	if (!isnan(Angles.z))
+		RotationZ = rotate(mat4(1.0f), Angles.z, vec3(0, 0, -1));
+	else
+		RotationZ = mat4(1.0f);
+
+	GimbalLockFixType FixType;
+
+	if (Bone->Parent != nullptr)
+		FixType = GetGimbalLockFixType(Bone->LowLimit, Bone->HighLimit);
+	else
+		FixType = None;
+
+	if (FixType == XtoY)
+		Bone->Rotation = RotationZ * RotationX * RotationY;
+	else
+	if (FixType == ZtoY)
+		Bone->Rotation = RotationY * RotationZ * RotationX;
+	else
+		Bone->Rotation = RotationZ * RotationY * RotationX;
+
+	SyncWorldWithCharacter();
+}
+
+PhysicsManager::GimbalLockFixType PhysicsManager::GetGimbalLockFixType(vec3 LowLimit, vec3 HighLimit)
 {
 	vec3 Ranges = vec3(
 		max(fabs(LowLimit.x), fabs(HighLimit.x)),
@@ -153,10 +322,28 @@ void PhysicsManager::ApplyGimbalLockFix(vec3& LowLimit, vec3& HighLimit, btTrans
 		throw new runtime_error("Too large angle range");
 
 	// switch Y -> X
-	if (MinRange == Ranges.x) {
+	if (MinRange == Ranges.x) 
+		return XtoY;
+	else
+	// switch Y -> Z
+	if (MinRange == Ranges.z) 
+		return ZtoY;
+	else {
+		assert(Ranges.y == MinRange);
+		return None;
+	}
+}
 
-		ParentFrame.getBasis().setEulerZYX(0, 0, M_PI_2);
-		ChildFrame.getBasis().setEulerZYX(0, 0, M_PI_2);
+void PhysicsManager::ApplyGimbalLockFix(vec3& LowLimit, vec3& HighLimit, btTransform& ParentFrame, btTransform& ChildFrame,
+	bool& XBlocked, bool& YBlocked, bool &ZBlocked)
+{
+	GimbalLockFixType FixType = GetGimbalLockFixType(LowLimit, HighLimit);
+
+	// switch Y -> X
+	if (FixType == XtoY) {
+
+		ParentFrame.getBasis().setEulerYPR(M_PI_2, 0, 0);
+		ChildFrame.getBasis().setEulerYPR(M_PI_2, 0, 0);
 
 		swap(LowLimit.x, LowLimit.y);
 		swap(HighLimit.x, HighLimit.y);
@@ -164,13 +351,15 @@ void PhysicsManager::ApplyGimbalLockFix(vec3& LowLimit, vec3& HighLimit, btTrans
 		swap(LowLimit.y, HighLimit.y);
 		LowLimit.y = -LowLimit.y;
 		HighLimit.y = -HighLimit.y;
+
+		swap(XBlocked, YBlocked);
 	}
 	else
 	// switch Y -> Z
-	if (MinRange == Ranges.z) {
+	if (FixType == ZtoY) {
 
-		ParentFrame.getBasis().setEulerZYX(-M_PI_2, 0, 0);
-		ChildFrame.getBasis().setEulerZYX(-M_PI_2, 0, 0);
+		ParentFrame.getBasis().setEulerYPR(0, 0, -M_PI_2);
+		ChildFrame.getBasis().setEulerYPR(0, 0, -M_PI_2);
 
 		swap(LowLimit.z, LowLimit.y);
 		swap(HighLimit.z, HighLimit.y);
@@ -178,9 +367,26 @@ void PhysicsManager::ApplyGimbalLockFix(vec3& LowLimit, vec3& HighLimit, btTrans
 		swap(LowLimit.y, HighLimit.y);
 		LowLimit.y = -LowLimit.y;
 		HighLimit.y = -HighLimit.y;
+
+		swap(ZBlocked, YBlocked);
+	}
+}
+
+void PhysicsManager::ReverseGimbalLockFix(vec3 LowLimit, vec3 HighLimit, vec3& Angles)
+{
+	GimbalLockFixType FixType = GetGimbalLockFixType(LowLimit, HighLimit);
+
+	if (FixType == XtoY) {
+
+		Angles.y = -Angles.y;
+		swap(Angles.x, Angles.y);
 	}
 	else
-		assert(Ranges.y == MinRange);
+	if (FixType == ZtoY) {
+
+		Angles.y = -Angles.y;
+		swap(Angles.z, Angles.y);
+	}
 }
 
 void PhysicsManager::CreateFloor(float FloorSize2D, float FloorHeight)

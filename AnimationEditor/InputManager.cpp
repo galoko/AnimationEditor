@@ -90,6 +90,14 @@ void InputManager::ProcessMouseInput(LONG dx, LONG dy) {
 	}
 }
 
+void InputManager::SetState(InputState NewState)
+{
+	if (State == InverseKinematic && NewState != InverseKinematic)
+		AnimationManager::GetInstance().CancelInverseKinematic();
+
+	State = NewState;
+}
+
 bool InputManager::IsInteractionMode(void)
 {
 	return !IsCameraMode;
@@ -158,18 +166,28 @@ void InputManager::ProcessCameraMovement(double dt)
 
 vec3 InputManager::GetPlaneNormal(void)
 {	
+	vec3 CameraNormal = -Render::GetInstance().GetLookingDirection();
+
+	vec3 Result = { 0, 0, 0 };
+
 	switch (PlaneMode) {
 	case PlaneCamera:
-		return -Render::GetInstance().GetLookingDirection();
+		Result = CameraNormal;
+		break;
 	case PlaneX:
-		return { 1, 0, 0 };
+		Result = { 1, 0, 0 };
+		break;
 	case PlaneY:
-		return { 0, 1, 0 };
+		Result = { 0, 1, 0 };
+		break;
 	case PlaneZ:
-		return { 0, 0, 1 };
-	default:
-		return { 0, 0, 0 };
+		Result = { 0, 0, 1 };
+		break;
 	}
+
+	float Direction = dot(CameraNormal, Result) > 0 ? 1.0f : -1.0f;
+
+	return Result * Direction;
 }
 
 void InputManager::SetWorldPointToScreePoint(LONG x, LONG y) {
@@ -222,17 +240,17 @@ void InputManager::ProcessKeyboardInput(double dt) {
 		if (State == None)
 			CancelSelection();
 		else
-			State = None;
+			SetState(None);
 	}
 
 	if (WasPressed('Q')) {
 		if (State == None) {
 			SetCursorToWorldPoint(Selection.GetWorldPoint());
-			State = InverseKinematic;
+			SetState(InverseKinematic);
 		}
 		else
-		if (State == InverseKinematic)
-			State = None;
+		if (State == InverseKinematic) 
+			SetState(None);		
 	}
 
 	if (WasPressed('R') && Selection.HaveBone()) {
@@ -336,14 +354,19 @@ void InputManager::Deserialize(InputSerializedState& State)
 {
 	Character* Char = CharacterManager::GetInstance().GetCharacter();
 
-	this->State = (InputState)State.State;
 	this->PlaneMode = (enum PlaneMode)State.PlaneMode;
 
 	Selection.Bone = State.BoneName != L"" ? Char->FindBone(State.BoneName) : nullptr;
 	Selection.LocalPoint = State.LocalPoint;
 	Selection.SetWorldPoint(State.WorldPoint);
 
-	SetCursorToWorldPoint(Selection.GetWorldPoint());
+	if (Selection.HaveBone())
+		SetState((InputState)State.State);
+	else
+		SetState(None);
+
+	if (this->State != None && Selection.HaveBone())
+		SetCursorToWorldPoint(Selection.GetWorldPoint());
 }
 
 // General API

@@ -4,24 +4,29 @@ interface
 
 uses
   Winapi.Windows,
-  Vcl.Forms,
-  Utils.FPUState;
+  Vcl.Forms;
 
 type
   TButtonCallback = procedure (const Name: PWideChar); stdcall;
   TCheckBoxCallback = procedure (const Name: PWideChar; IsChecked: Boolean); stdcall;
   TEditCallback = procedure (const Name, Text: PWideChar); stdcall;
+  TTrackBarCallback = procedure (const Name: PWideChar; t: Single); stdcall;
   TIdleCallback = procedure; stdcall;
 
 procedure aegInitialize; stdcall;
-procedure aegSetIdleCallback(Callback: TIdleCallback); stdcall;
 procedure aegSetOpenGLWindow(Window: HWND); stdcall;
+
+procedure aegSetIdleCallback(Callback: TIdleCallback); stdcall;
 procedure aegSetButtonCallback(Callback: TButtonCallback); stdcall;
 procedure aegSetCheckBoxCallback(Callback: TCheckBoxCallback); stdcall;
 procedure aegSetEditCallback(Callback: TEditCallback); stdcall;
+procedure aegSetTrackBarCallback(Callback: TTrackBarCallback); stdcall;
+
 procedure aegSetEnabled(const Name: PWideChar; IsEnabled: Boolean); stdcall;
 procedure aegSetChecked(const Name: PWideChar; IsChecked: Boolean); stdcall;
 procedure aegSetText(const Name, Text: PWideChar); stdcall;
+procedure aegSetPosition(const Name: PWideChar; t: Single); stdcall;
+
 procedure aegRun; stdcall;
 
 implementation
@@ -31,21 +36,25 @@ uses
 
 exports
   aegInitialize,
-  aegSetIdleCallback,
   aegSetOpenGLWindow,
+
+  aegSetIdleCallback,
   aegSetButtonCallback,
   aegSetCheckBoxCallback,
   aegSetEditCallback,
+  aegSetTrackBarCallback,
+
   aegSetEnabled,
   aegSetChecked,
   aegSetText,
+  aegSetPosition,
+
   aegRun;
 
 type
   Dummy = class abstract
     class var
       ExternalIdleCallback: TIdleCallback;
-      FPUState: TFPUState;
     class procedure IdleCallback(Sender: TObject; var Done: Boolean);
   end;
 
@@ -81,6 +90,11 @@ begin
   AnimationEditorForm.SetEditCallback(Callback);
 end;
 
+procedure aegSetTrackBarCallback(Callback: TTrackBarCallback);
+begin
+  AnimationEditorForm.SetTrackBarCallback(Callback);
+end;
+
 procedure aegSetEnabled(const Name: PWideChar; IsEnabled: Boolean);
 begin
   AnimationEditorForm.SetEnabled(Name, IsEnabled);
@@ -94,6 +108,11 @@ end;
 procedure aegSetText(const Name, Text: PWideChar);
 begin
   AnimationEditorForm.SetText(Name, Text);
+end;
+
+procedure aegSetPosition(const Name: PWideChar; t: Single);
+begin
+  AnimationEditorForm.SetPosition(Name, t);
 end;
 
 procedure aegRun; stdcall;

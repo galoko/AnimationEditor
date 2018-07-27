@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, Vcl.StdCtrls, Vcl.AppEvnts,
-  GUI.ExternalInterface;
+  GUI.ExternalInterface, Vcl.ComCtrls;
 
 type
   TAnimationEditorForm = class(TForm)
@@ -26,12 +26,17 @@ type
     XAngleInput: TEdit;
     YAngleInput: TEdit;
     ZAngleInput: TEdit;
+    XAxisBar: TTrackBar;
+    YAxisBar: TTrackBar;
+    ZAxisBar: TTrackBar;
     procedure ApplicationEventsMessage(var Msg: tagMSG; var Handled: Boolean);
     procedure FormCreate(Sender: TObject);
     procedure ButtonClick(Sender: TObject);
     procedure CheckBoxClick(Sender: TObject);
     procedure EditKeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
+    procedure EditKeyPress(Sender: TObject; var Key: Char);
+    procedure TrackBarChange(Sender: TObject);
   private
     { Private declarations }
     IsInSetMode: Boolean;
@@ -41,17 +46,22 @@ type
     ButtonCallback: TButtonCallback;
     CheckBoxCallback: TCheckBoxCallback;
     EditCallback: TEditCallback;
+    TrackBarCallback: TTrackBarCallback;
 
     procedure SetupCallbacks(Component: TComponent);
   public
     { Public declarations }
     procedure SetOpenGLWindow(Window: HWND);
+
     procedure SetButtonCallback(Callback: TButtonCallback);
     procedure SetCheckBoxCallback(Callback: TCheckBoxCallback);
     procedure SetEditCallback(Callback: TEditCallback);
+    procedure SetTrackBarCallback(Callback: TTrackBarCallback);
+
     procedure SetEnabled(const Name: String; IsEnabled: Boolean); reintroduce;
     procedure SetChecked(const Name: String; IsChecked: Boolean);
     procedure SetText(const Name, Text: String);
+    procedure SetPosition(const Name: String; t: Single);
   end;
 
 var
@@ -77,7 +87,13 @@ begin
     TCheckBox(Component).OnClick:= CheckBoxClick
   else
   if Component is TEdit then
+  begin
     TEdit(Component).OnKeyDown:= EditKeyDown;
+    TEdit(Component).OnKeyPress:= EditKeyPress;
+  end
+  else
+  if Component is TTrackBar then
+    TTrackBar(Component).OnChange:= TrackBarChange;
 
   for SubComponent in Component do
     SetupCallbacks(SubComponent);
@@ -113,8 +129,35 @@ begin
   Edit:= Sender as TEdit;
 
   if Key = VK_RETURN then
+  begin
+    Key:= 0;
+
     if Assigned(EditCallback) then
       EditCallback(PWideChar(Edit.Name), PWideChar(Edit.Text));
+
+    Edit.Parent.SetFocus;
+  end;
+end;
+
+procedure TAnimationEditorForm.EditKeyPress(Sender: TObject; var Key: Char);
+begin
+  if Ord(Key) = VK_RETURN then
+    Key:= #0;
+end;
+
+procedure TAnimationEditorForm.TrackBarChange(Sender: TObject);
+var
+  TrackBar: TTrackBar;
+  t: Single;
+begin
+  if not IsInSetMode and Assigned(TrackBarCallback) then
+  begin
+    TrackBar:= Sender as TTrackBar;
+
+    t:= (TrackBar.Position - TrackBar.Min) / (TrackBar.Max - TrackBar.Min);
+
+    TrackBarCallback(PWideChar(TrackBar.Name), t);
+  end;
 end;
 
 procedure TAnimationEditorForm.ApplicationEventsMessage(var Msg: tagMSG;
@@ -148,6 +191,11 @@ end;
 procedure TAnimationEditorForm.SetEditCallback(Callback: TEditCallback);
 begin
   EditCallback:= Callback;
+end;
+
+procedure TAnimationEditorForm.SetTrackBarCallback(Callback: TTrackBarCallback);
+begin
+  TrackBarCallback:= Callback;
 end;
 
 procedure TAnimationEditorForm.SetEnabled(const Name: String;
@@ -199,6 +247,30 @@ begin
 
     IsInSetMode:= True;
     TEdit(Component).Text:= Text;
+    IsInSetMode:= False;
+  end;
+end;
+
+procedure TAnimationEditorForm.SetPosition(const Name: String; t: Single);
+var
+  Component: TComponent;
+  TrackBar: TTrackBar;
+  Position: Integer;
+begin
+  Component:= FindComponent(Name);
+  if Component = nil then
+    Exit;
+
+  if Component is TTrackBar then
+  begin
+    TrackBar:= TTrackBar(Component);
+    if TrackBar.Focused then
+      Exit;
+
+    Position:= TrackBar.Min + Round((TrackBar.Max - TrackBar.Min) * t);
+
+    IsInSetMode:= True;
+    TrackBar.Position:= Position;
     IsInSetMode:= False;
   end;
 end;

@@ -382,13 +382,10 @@ void RenderSerializedState::SaveToXML(XMLDocument& Document, XMLNode* Root)
 	CameraPosition->SetAttribute("Z", this->CameraPosition.z);
 	RenderState->InsertEndChild(CameraPosition);
 
-	XMLElement* CameraAngleX = Document.NewElement("CameraAngleX");
-	CameraAngleX->SetAttribute("Value", this->CameraAngleX);
-	RenderState->InsertEndChild(CameraAngleX);
-
-	XMLElement* CameraAngleZ = Document.NewElement("CameraAngleZ");
-	CameraAngleZ->SetAttribute("Value", this->CameraAngleZ);
-	RenderState->InsertEndChild(CameraAngleZ);
+	XMLElement* CameraAngle = Document.NewElement("CameraAngle");
+	CameraAngle->SetAttribute("X", degrees(this->CameraAngleX));
+	CameraAngle->SetAttribute("Z", degrees(this->CameraAngleZ));
+	RenderState->InsertEndChild(CameraAngle);
 
 	Root->InsertEndChild(RenderState);
 }
@@ -408,13 +405,11 @@ bool RenderSerializedState::LoadFromXML(XMLDocument& Document, XMLNode* Root)
 		this->CameraPosition.z = attribute_float_value(CameraPosition, "Z");
 	}
 
-	XMLElement* CameraAngleX = RenderState->FirstChildElement("CameraAngleX");
-	if (CameraAngleX != nullptr)
-		this->CameraAngleX = attribute_float_value(CameraAngleX, "Value");
-
-	XMLElement* CameraAngleZ = RenderState->FirstChildElement("CameraAngleZ");
-	if (CameraAngleZ != nullptr)
-		this->CameraAngleZ = attribute_float_value(CameraAngleZ, "Value");
+	XMLElement* CameraAngle = RenderState->FirstChildElement("CameraAngle");
+	if (CameraAngle != nullptr) {
+		this->CameraAngleX = radians(attribute_float_value(CameraAngle, "X"));
+		this->CameraAngleZ = radians(attribute_float_value(CameraAngle, "Z"));
+	}
 
 	return true;
 }

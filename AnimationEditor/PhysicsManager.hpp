@@ -69,8 +69,16 @@ private:
 	void CreateFloor(float FloorSize2D, float FloorHeight);
 	void CreatePhysicsForCharacter(void);
 
-	void ApplyGimbalLockFix(vec3& LowLimit, vec3& HighLimit, btTransform& ParentFrame, btTransform& ChildFrame);
-	void AddConstraint(Bone* Parent, Bone* Child, vec3 ParentLocalPoint, vec3 ChildLocalPoint);
+	typedef enum GimbalLockFixType {
+		None,
+		XtoY,
+		ZtoY
+	} GimbalLockFixType;
+
+	GimbalLockFixType GetGimbalLockFixType(vec3 LowLimit, vec3 HighLimit);
+	void ApplyGimbalLockFix(vec3& LowLimit, vec3& HighLimit, btTransform& ParentFrame, btTransform& ChildFrame,
+		bool& XBlocked, bool& YBlocked, bool &ZBlocked);
+	void ReverseGimbalLockFix(vec3 LowLimit, vec3 HighLimit, vec3& Angles);
 public:
 	static PhysicsManager& GetInstance(void) {
 		static PhysicsManager Instance;
@@ -108,6 +116,10 @@ public:
 	void SetPinpoint(Pinpoint& P, btRigidBody* Body, vec3 LocalPoint, vec3 WorldPoint);
 
 	static mat4 GetBoneWorldTransform(Bone* Bone);
+
+	void UpdateBoneConstraint(Bone* Child, bool XBlocked, bool YBlocked, bool ZBlocked);
+	vec3 GetBoneAngles(Bone* Bone);
+	void SetBoneAngles(Bone* Bone, vec3 Angles);
 
 	void SyncWorldWithCharacter(void);
 } PhysicsManager;

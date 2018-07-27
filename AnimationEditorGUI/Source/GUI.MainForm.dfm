@@ -37,7 +37,7 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 0
     end
     object XAxis: TCheckBox
-      Left = 215
+      Left = 296
       Top = 20
       Width = 50
       Height = 17
@@ -45,7 +45,7 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 4
     end
     object YAxis: TCheckBox
-      Left = 215
+      Left = 296
       Top = 43
       Width = 50
       Height = 17
@@ -53,7 +53,7 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 5
     end
     object ZAxis: TCheckBox
-      Left = 215
+      Left = 296
       Top = 66
       Width = 50
       Height = 17
@@ -85,21 +85,21 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 3
     end
     object XPosInput: TEdit
-      Left = 288
+      Left = 215
       Top = 16
       Width = 49
       Height = 21
       TabOrder = 7
     end
     object YPosInput: TEdit
-      Left = 288
+      Left = 215
       Top = 43
       Width = 49
       Height = 21
       TabOrder = 8
     end
     object ZPosInput: TEdit
-      Left = 288
+      Left = 215
       Top = 70
       Width = 49
       Height = 21
@@ -125,6 +125,30 @@ object AnimationEditorForm: TAnimationEditorForm
       Width = 49
       Height = 21
       TabOrder = 12
+    end
+    object XAxisBar: TTrackBar
+      Left = 407
+      Top = 16
+      Width = 75
+      Height = 21
+      Max = 3600
+      TabOrder = 13
+    end
+    object YAxisBar: TTrackBar
+      Left = 407
+      Top = 43
+      Width = 75
+      Height = 21
+      Max = 3600
+      TabOrder = 14
+    end
+    object ZAxisBar: TTrackBar
+      Left = 407
+      Top = 70
+      Width = 75
+      Height = 21
+      Max = 3600
+      TabOrder = 15
     end
   end
   object OpenGLPanel: TPanel

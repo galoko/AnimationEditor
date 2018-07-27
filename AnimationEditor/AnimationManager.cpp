@@ -55,7 +55,8 @@ void AnimationManager::SetBoneBlocking(Bone* Bone, BlockingInfo Blocking)
 	PhysicsManager::GetInstance().ChangeObjectMass(Bone->PhysicBody, Blocking.IsFullyBlocked() ? 0 : Bone->Mass);
 
 	Bone->PhysicBody->setLinearFactor(GLMToBullet({ Blocking.XPos ? 1 : 0, Blocking.YPos ? 1 : 0, Blocking.ZPos ? 1 : 0 }));
-	Bone->PhysicBody->setAngularFactor(GLMToBullet({ Blocking.XAxis ? 1 : 0, Blocking.YAxis ? 1 : 0, Blocking.ZAxis ? 1 : 0 }));
+
+	PhysicsManager::GetInstance().UpdateBoneConstraint(Bone, !Blocking.XAxis, !Blocking.YAxis, !Blocking.ZAxis);
 
 	Form::GetInstance().UpdateBlocking();
 }

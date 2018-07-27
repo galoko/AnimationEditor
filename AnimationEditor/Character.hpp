@@ -30,7 +30,11 @@ public:
 
 	float Mass;
 
+	vec3 JointLocalPoint, ParentJointLocalPoint;
+	bool XAxisBlocked, YAxisBlocked, ZAxisBlocked;
+
 	btRigidBody* PhysicBody;
+	btTypedConstraint* PhysicConstraint;
 
 	AnimationContext* AnimCtx;
 
@@ -52,6 +56,7 @@ private:
 	Bone* GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, vec3 LowLimit, vec3 HighLimit, vec3 LogicalDirection, wstring Name);
 	void GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 MirrorDirection);
 	void GenerateBones(void);
+	void CalculateJointLocations(void);
 public:
 	vec3 Position;
 

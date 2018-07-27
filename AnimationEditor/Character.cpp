@@ -9,6 +9,7 @@ Character::Character(void)
 	GenerateBones();
 	UpdateWorldTranforms();
 	UpdateFloorZ();
+	CalculateJointLocations();
 }
 
 Bone* Character::GenerateBone(Bone* Parent, vec3 Tail, vec3 Size, vec3 Offset, vec3 LowLimit, vec3 HighLimit, vec3 LogicalDirection, wstring Name)
@@ -66,7 +67,10 @@ void Character::GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 Mirror
 
 void Character::GenerateBones(void)
 {
-	Pelvis = GenerateBone(nullptr, { 0, 0, 1.0f }, { 6.5f, 13.0f, 17.6f }, {}, {}, {}, { 1, 0, 0 }, L"Pelvis");
+	Pelvis = GenerateBone(nullptr, { 0, 0, 1.0f }, { 6.5f, 13.0f, 17.6f }, { 0, 0, 0 },  
+		{ -180, -89, -180 },
+		{  180,  89,  180 }, 
+		{ 1, 0, 0 }, L"Pelvis");
 
 	Bone* Stomach = GenerateBone(Pelvis, { 0, 0, 1.0f }, { 6.5f, 13.0f, 17.6f }, { 0, 0, 1 }, 
 		{    0,  -70,  -10 }, 
@@ -140,6 +144,25 @@ void Character::UpdateFloorZ(void)
 		float Z = MiddleTransform[3].z - Bone->Size.z * 0.5f;
 
 		FloorZ = min(FloorZ, Z);
+	}
+}
+
+void Character::CalculateJointLocations(void)
+{
+	for (Bone* Child : Bones) {
+
+		Bone* Parent = Child->Parent;
+		if (Parent == nullptr)
+			continue;
+
+		vec4 Zero = vec4(0, 0, 0, 1);
+
+		vec3 ChildHead = Child->WorldTransform * Zero;
+		vec3 ChildPosition = Child->WorldTransform * Child->MiddleTranslation * Zero;
+		vec3 ParentPosition = Parent->WorldTransform * Parent->MiddleTranslation * Zero;
+
+		Child->JointLocalPoint = ChildHead - ChildPosition;
+		Child->ParentJointLocalPoint = ChildHead - ParentPosition;
 	}
 }
 

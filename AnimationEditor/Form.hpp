@@ -24,7 +24,7 @@ private:
 	// Update
 
 	int32 UpdateBlockCounter;
-	bool IsBlockingUpdatePending;
+	bool IsBlockingUpdatePending, IsPositionsAndAnglesUpdatePending;
 	
 	void ProcessPendingUpdates(void);
 
@@ -35,6 +35,10 @@ private:
 	void ButtonCallback(const wstring Name);
 	static void __stdcall CheckBoxStaticCallback(const wchar_t* Name, bool IsChecked);
 	void CheckBoxCallback(const wstring Name, bool IsChecked);
+	static void __stdcall EditStaticCallback(const wchar_t* Name, const wchar_t* Text);
+	void EditCallback(const wstring Name, const wstring Text);
+	static void __stdcall TrackBarStaticCallback(const wchar_t* Name, float t);
+	void TrackBarCallback(const wstring Name, float t);
 public:
 	static Form& GetInstance(void) {
 		static Form Instance;

@@ -1,6 +1,11 @@
 ﻿library AnimationEditorGUI;
 
 uses
+  madExcept,
+  madLinkDisAsm,
+  madListHardware,
+  madListProcesses,
+  madListModules,
   Winapi.Windows,
   GUI.ExternalInterface in 'GUI.ExternalInterface.pas',
   GUI.MainForm in 'GUI.MainForm.pas' {AnimationEditorForm};

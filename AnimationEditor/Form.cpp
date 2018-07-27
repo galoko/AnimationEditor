@@ -45,6 +45,8 @@ HWND Form::Initialize(HINSTANCE hInstance) {
 	aegSetOpenGLWindow(WindowHandle);
 	aegSetButtonCallback(ButtonStaticCallback);
 	aegSetCheckBoxCallback(CheckBoxStaticCallback);
+	aegSetEditCallback(EditStaticCallback);
+	aegSetTrackBarCallback(TrackBarStaticCallback);
 
 	UpdateBlocking();
 	UpdatePositionAndAngles();
@@ -204,6 +206,69 @@ void Form::CheckBoxCallback(const wstring Name, bool IsChecked)
 		AnimationManager::GetInstance().SetBoneBlocking(Bone, Blocking);
 }
 
+void Form::EditStaticCallback(const wchar_t* Name, const wchar_t* Text)
+{
+	Form::GetInstance().EditCallback(Name, Text);
+}
+
+void Form::EditCallback(const wstring Name, const wstring Text)
+{
+	float Value = stof(Text, nullptr);
+
+	if (Name == X_ANGLE_INPUT || Name == Y_ANGLE_INPUT || Name == Z_ANGLE_INPUT) {
+
+		float Angle = radians(Value);
+
+		Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
+		if (Bone == nullptr)
+			return;
+
+		vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Bone);
+
+		if (Name == X_ANGLE_INPUT)
+			Angles.x = Angle;
+		else
+		if (Name == Y_ANGLE_INPUT)
+			Angles.y = Angle;
+		else
+		if (Name == Z_ANGLE_INPUT)
+			Angles.z = Angle;
+
+		PhysicsManager::GetInstance().SetBoneAngles(Bone, Angles);
+	}
+}
+
+void Form::TrackBarStaticCallback(const wchar_t* Name, float t)
+{
+	Form::GetInstance().TrackBarCallback(Name, t);
+}
+
+void Form::TrackBarCallback(const wstring Name, float t)
+{
+	if (Name == X_AXIS_BAR || Name == Y_AXIS_BAR || Name == Z_AXIS_BAR) {
+
+		Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
+		if (Bone == nullptr)
+			return;
+
+		vec3 LowLimit = Bone->LowLimit;
+		vec3 HighLimit = Bone->HighLimit;
+
+		vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Bone);
+
+		if (Name == X_AXIS_BAR)
+			Angles.x = LowLimit.x + (HighLimit.x - LowLimit.x) * t;
+		else
+		if (Name == Y_AXIS_BAR)
+			Angles.y = LowLimit.y + (HighLimit.y - LowLimit.y) * t;
+		else
+		if (Name == Z_AXIS_BAR)
+			Angles.z = LowLimit.z + (HighLimit.z - LowLimit.z) * t;
+
+		PhysicsManager::GetInstance().SetBoneAngles(Bone, Angles);
+	}
+}
+
 void Form::UpdateBlocking(void)
 {
 	CheckFormUpdateBlock(IsBlockingUpdatePending);
@@ -219,47 +284,6 @@ void Form::UpdateBlocking(void)
 		aegSetEnabled(Y_AXIS, false);
 		aegSetEnabled(Z_AXIS, false);
 
-		aegSetEnabled(X_POS_INPUT,   false);
-		aegSetEnabled(Y_POS_INPUT,   false);
-		aegSetEnabled(Z_POS_INPUT,   false);
-		aegSetEnabled(X_ANGLE_INPUT, false);
-		aegSetEnabled(Y_ANGLE_INPUT, false);
-		aegSetEnabled(Z_ANGLE_INPUT, false);
-
-		return;
-	}
-
-	aegSetEnabled(CONSTRAIN_POSITION, true);
-
-	aegSetEnabled(X_POS,  true);
-	aegSetEnabled(Y_POS,  true);
-	aegSetEnabled(Z_POS,  true);
-	aegSetEnabled(X_AXIS, true);
-	aegSetEnabled(Y_AXIS, true);
-	aegSetEnabled(Z_AXIS, true);
-
-	aegSetEnabled(X_POS_INPUT,   true);
-	aegSetEnabled(Y_POS_INPUT,   true);
-	aegSetEnabled(Z_POS_INPUT,   true);
-	aegSetEnabled(X_ANGLE_INPUT, true);
-	aegSetEnabled(Y_ANGLE_INPUT, true);
-	aegSetEnabled(Z_ANGLE_INPUT, true);
-
-	BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
-
-	aegSetChecked(X_POS,  Blocking.XPos);
-	aegSetChecked(Y_POS,  Blocking.YPos);
-	aegSetChecked(Z_POS,  Blocking.ZPos);
-	aegSetChecked(X_AXIS, Blocking.XAxis);
-	aegSetChecked(Y_AXIS, Blocking.YAxis);
-	aegSetChecked(Z_AXIS, Blocking.ZAxis);
-}
-
-void Form::UpdatePositionAndAngles(void)
-{
-	InputSelection Selection = InputManager::GetInstance().GetSelection();
-	if (!Selection.HaveBone()) {
-
 		aegSetChecked(X_POS,  true);
 		aegSetChecked(Y_POS,  true);
 		aegSetChecked(Z_POS,  true);
@@ -267,56 +291,171 @@ void Form::UpdatePositionAndAngles(void)
 		aegSetChecked(Y_AXIS, true);
 		aegSetChecked(Z_AXIS, true);
 
-		aegSetText(X_POS_INPUT,   L"");
-		aegSetText(Y_POS_INPUT,   L"");
-		aegSetText(Z_POS_INPUT,   L"");
+		return;
+	}
+
+	aegSetEnabled(CONSTRAIN_POSITION, true);
+
+	BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
+	vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Selection.Bone);
+
+	aegSetEnabled(X_POS, true);
+	aegSetEnabled(Y_POS, true);
+	aegSetEnabled(Z_POS, true);
+
+	aegSetChecked(X_POS, Blocking.XPos);
+	aegSetChecked(Y_POS, Blocking.YPos);
+	aegSetChecked(Z_POS, Blocking.ZPos);
+
+	if (!isnan(Angles.x)) {
+		aegSetEnabled(X_AXIS, true);
+		aegSetChecked(X_AXIS, Blocking.XAxis);
+	}
+	else {
+		aegSetEnabled(X_AXIS, false);
+		aegSetChecked(X_AXIS, false);
+	}
+
+	if (!isnan(Angles.y)) {
+		aegSetEnabled(Y_AXIS, true);
+		aegSetChecked(Y_AXIS, Blocking.YAxis);
+	}
+	else {
+		aegSetEnabled(Y_AXIS, false);
+		aegSetChecked(Y_AXIS, false);
+	}
+
+	if (!isnan(Angles.z)) {
+		aegSetEnabled(Z_AXIS, true);
+		aegSetChecked(Z_AXIS, Blocking.ZAxis);
+	}
+	else {
+		aegSetEnabled(Z_AXIS, false);
+		aegSetChecked(Z_AXIS, false);
+	}
+}
+
+wstring f2ws(float f, int precision) {
+
+	wstringstream StringStream;
+
+	StringStream << fixed << setprecision(precision) << f;
+
+	return StringStream.str();
+}
+
+void Form::UpdatePositionAndAngles(void)
+{
+	CheckFormUpdateBlock(IsPositionsAndAnglesUpdatePending);
+
+	InputSelection Selection = InputManager::GetInstance().GetSelection();
+	if (!Selection.HaveBone()) {
+
+		aegSetEnabled(X_POS_INPUT, false);
+		aegSetEnabled(Y_POS_INPUT, false);
+		aegSetEnabled(Z_POS_INPUT, false);
+		aegSetEnabled(X_ANGLE_INPUT, false);
+		aegSetEnabled(Y_ANGLE_INPUT, false);
+		aegSetEnabled(Z_ANGLE_INPUT, false);
+		aegSetEnabled(X_AXIS_BAR, false);
+		aegSetEnabled(Y_AXIS_BAR, false);
+		aegSetEnabled(Z_AXIS_BAR, false);
+
+		aegSetText(X_POS_INPUT, L"");
+		aegSetText(Y_POS_INPUT, L"");
+		aegSetText(Z_POS_INPUT, L"");
 		aegSetText(X_ANGLE_INPUT, L"");
 		aegSetText(Y_ANGLE_INPUT, L"");
 		aegSetText(Z_ANGLE_INPUT, L"");
 
+		aegSetPosition(X_AXIS_BAR, 0);
+		aegSetPosition(Y_AXIS_BAR, 0);
+		aegSetPosition(Z_AXIS_BAR, 0);
+
 		return;
 	}
 
+	aegSetEnabled(X_POS_INPUT,   true);
+	aegSetEnabled(Y_POS_INPUT,   true);
+	aegSetEnabled(Z_POS_INPUT,   true);
+	
+	aegSetEnabled(Y_ANGLE_INPUT, true);
+	aegSetEnabled(Z_ANGLE_INPUT, true);
+
+	vec3 LowLimit = Selection.Bone->LowLimit;
+	vec3 HighLimit = Selection.Bone->HighLimit;
+
 	vec3 WorldPoint = (Selection.Bone->WorldTransform * Selection.Bone->MiddleTranslation) * vec4(0, 0, 0, 1); // to cm
-	WorldPoint *= 100.0f;
+	WorldPoint *= 100.0f; // to cm
 
-	wstringstream StringStream;
+	vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Selection.Bone);
 
-	StringStream.str(L"");
-	StringStream << fixed << setprecision(3) << WorldPoint.x;
-	wstring XPos = StringStream.str();
+	aegSetText(X_POS_INPUT, f2ws(WorldPoint.x, 3).c_str());
+	aegSetText(Y_POS_INPUT, f2ws(WorldPoint.y, 3).c_str());
+	aegSetText(Z_POS_INPUT, f2ws(WorldPoint.z, 3).c_str());
 
-	StringStream.str(L"");
-	StringStream << fixed << setprecision(3) << WorldPoint.y;
-	wstring YPos = StringStream.str();
+	if (!isnan(Angles.x)) {
+		aegSetEnabled(X_ANGLE_INPUT, true);
+		aegSetText(X_ANGLE_INPUT, f2ws(degrees(Angles.x), 2).c_str());
 
-	StringStream.str(L"");
-	StringStream << fixed << setprecision(3) << WorldPoint.z;
-	wstring ZPos = StringStream.str();
+		float LimitLen = HighLimit.x - LowLimit.x;
+		if (LimitLen > 0) {
+			aegSetEnabled(X_AXIS_BAR, true);
+			aegSetPosition(X_AXIS_BAR, (Angles.x - LowLimit.x) / LimitLen);
+		}
+		else {
+			aegSetEnabled(X_AXIS_BAR, false);
+			aegSetPosition(X_AXIS_BAR, 0);
+		}
+	}
+	else {
+		aegSetEnabled(X_ANGLE_INPUT, false);
+		aegSetText(X_ANGLE_INPUT, L"");
+		aegSetEnabled(X_AXIS_BAR, false);
+		aegSetPosition(X_AXIS_BAR, 0);
+	}
+	
+	if (!isnan(Angles.y)) {
+		aegSetEnabled(Y_ANGLE_INPUT, true);
+		aegSetText(Y_ANGLE_INPUT, f2ws(degrees(Angles.y), 2).c_str());
 
-	quat Q = quat_cast(Selection.Bone->Rotation);
-	vec3 Angles = eulerAngles(Q);
+		float LimitLen = HighLimit.y - LowLimit.y;
+		if (LimitLen > 0) {
+			aegSetEnabled(Y_AXIS_BAR, true);
+			aegSetPosition(Y_AXIS_BAR, (Angles.y - LowLimit.y) / LimitLen);
+		}
+		else {
+			aegSetEnabled(Y_AXIS_BAR, false);
+			aegSetPosition(Y_AXIS_BAR, 0);
+		}
+	}
+	else {
+		aegSetEnabled(Y_ANGLE_INPUT, false);
+		aegSetText(Y_ANGLE_INPUT, L"");
+		aegSetEnabled(Y_AXIS_BAR, false);
+		aegSetPosition(Y_AXIS_BAR, 0);
+	}
 
-	StringStream.str(L"");
-	StringStream << fixed << setprecision(2) << degrees(Angles.x);
-	wstring XAngle = StringStream.str();
+	if (!isnan(Angles.z)) {
+		aegSetEnabled(Z_ANGLE_INPUT, true);
+		aegSetText(Z_ANGLE_INPUT, f2ws(degrees(Angles.z), 2).c_str());
 
-	StringStream.str(L"");
-	StringStream << fixed << setprecision(2) << degrees(Angles.y);
-	wstring YAngle = StringStream.str();
-
-	StringStream.str(L"");
-	StringStream << fixed << setprecision(2) << degrees(Angles.z);
-	wstring ZAngle = StringStream.str();
-
-	aegSetText(X_POS_INPUT, XPos.c_str());
-	aegSetText(Y_POS_INPUT, YPos.c_str());
-	aegSetText(Z_POS_INPUT, ZPos.c_str());
-
-	aegSetText(X_ANGLE_INPUT, XAngle.c_str());
-	aegSetText(Y_ANGLE_INPUT, YAngle.c_str());
-	aegSetText(Z_ANGLE_INPUT, ZAngle.c_str());
-
+		float LimitLen = HighLimit.z - LowLimit.z;
+		if (LimitLen > 0) {
+			aegSetEnabled(Z_AXIS_BAR, true);
+			aegSetPosition(Z_AXIS_BAR, (Angles.z - LowLimit.z) / LimitLen);
+		}
+		else {
+			aegSetEnabled(Z_AXIS_BAR, false);
+			aegSetPosition(Z_AXIS_BAR, 0);
+		}
+	}
+	else {
+		aegSetEnabled(Z_ANGLE_INPUT, false);
+		aegSetText(Z_ANGLE_INPUT, L"");
+		aegSetEnabled(Z_AXIS_BAR, false);
+		aegSetPosition(Z_AXIS_BAR, 0);
+	}
 }
 
 void Form::ProcessPendingUpdates(void)
@@ -324,5 +463,9 @@ void Form::ProcessPendingUpdates(void)
 	if (IsBlockingUpdatePending) {
 		IsBlockingUpdatePending = false;
 		UpdateBlocking();
+	}
+	if (IsPositionsAndAnglesUpdatePending) {
+		IsPositionsAndAnglesUpdatePending = false;
+		UpdatePositionAndAngles();
 	}
 }

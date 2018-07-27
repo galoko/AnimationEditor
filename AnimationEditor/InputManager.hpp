@@ -52,6 +52,8 @@ private:
 
 	InputSelection Selection;
 
+	void SetState(InputState NewState);
+
 	bool IsInteractionMode(void);
 	void SelectBoneAtScreenPoint(LONG x, LONG y);
 	void CancelSelection(void);
