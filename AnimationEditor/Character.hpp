@@ -10,7 +10,7 @@
 using namespace std;
 using namespace glm;
 
-struct AnimationManagerInfo;
+struct AnimationContext;
 
 typedef class Bone {
 public:
@@ -32,7 +32,7 @@ public:
 
 	btRigidBody* PhysicBody;
 
-	AnimationManagerInfo* AnimInfo;
+	AnimationContext* AnimCtx;
 
 	bool IsFixed(void);
 	bool IsOnlyXRotation(void);

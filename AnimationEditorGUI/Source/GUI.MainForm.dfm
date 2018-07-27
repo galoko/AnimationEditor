@@ -84,6 +84,48 @@ object AnimationEditorForm: TAnimationEditorForm
       Caption = 'Z Position'
       TabOrder = 3
     end
+    object XPosInput: TEdit
+      Left = 288
+      Top = 16
+      Width = 49
+      Height = 21
+      TabOrder = 7
+    end
+    object YPosInput: TEdit
+      Left = 288
+      Top = 43
+      Width = 49
+      Height = 21
+      TabOrder = 8
+    end
+    object ZPosInput: TEdit
+      Left = 288
+      Top = 70
+      Width = 49
+      Height = 21
+      TabOrder = 9
+    end
+    object YAngleInput: TEdit
+      Left = 352
+      Top = 43
+      Width = 49
+      Height = 21
+      TabOrder = 10
+    end
+    object ZAngleInput: TEdit
+      Left = 352
+      Top = 70
+      Width = 49
+      Height = 21
+      TabOrder = 11
+    end
+    object XAngleInput: TEdit
+      Left = 352
+      Top = 16
+      Width = 49
+      Height = 21
+      TabOrder = 12
+    end
   end
   object OpenGLPanel: TPanel
     Left = 0

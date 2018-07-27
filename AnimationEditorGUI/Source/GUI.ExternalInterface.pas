@@ -10,6 +10,7 @@ uses
 type
   TButtonCallback = procedure (const Name: PWideChar); stdcall;
   TCheckBoxCallback = procedure (const Name: PWideChar; IsChecked: Boolean); stdcall;
+  TEditCallback = procedure (const Name, Text: PWideChar); stdcall;
   TIdleCallback = procedure; stdcall;
 
 procedure aegInitialize; stdcall;
@@ -17,8 +18,10 @@ procedure aegSetIdleCallback(Callback: TIdleCallback); stdcall;
 procedure aegSetOpenGLWindow(Window: HWND); stdcall;
 procedure aegSetButtonCallback(Callback: TButtonCallback); stdcall;
 procedure aegSetCheckBoxCallback(Callback: TCheckBoxCallback); stdcall;
+procedure aegSetEditCallback(Callback: TEditCallback); stdcall;
 procedure aegSetEnabled(const Name: PWideChar; IsEnabled: Boolean); stdcall;
 procedure aegSetChecked(const Name: PWideChar; IsChecked: Boolean); stdcall;
+procedure aegSetText(const Name, Text: PWideChar); stdcall;
 procedure aegRun; stdcall;
 
 implementation
@@ -32,8 +35,10 @@ exports
   aegSetOpenGLWindow,
   aegSetButtonCallback,
   aegSetCheckBoxCallback,
+  aegSetEditCallback,
   aegSetEnabled,
   aegSetChecked,
+  aegSetText,
   aegRun;
 
 type
@@ -71,6 +76,11 @@ begin
   AnimationEditorForm.SetCheckBoxCallback(Callback);
 end;
 
+procedure aegSetEditCallback(Callback: TEditCallback);
+begin
+  AnimationEditorForm.SetEditCallback(Callback);
+end;
+
 procedure aegSetEnabled(const Name: PWideChar; IsEnabled: Boolean);
 begin
   AnimationEditorForm.SetEnabled(Name, IsEnabled);
@@ -79,6 +89,11 @@ end;
 procedure aegSetChecked(const Name: PWideChar; IsChecked: Boolean);
 begin
   AnimationEditorForm.SetChecked(Name, IsChecked);
+end;
+
+procedure aegSetText(const Name, Text: PWideChar);
+begin
+  AnimationEditorForm.SetText(Name, Text);
 end;
 
 procedure aegRun; stdcall;

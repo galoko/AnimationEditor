@@ -2,8 +2,8 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "PhysicsManager.hpp"
 #include "CharacterManager.hpp"
+#include "Form.hpp"
 
 using namespace psm;
 
@@ -15,8 +15,8 @@ void AnimationManager::Initialize(void) {
 
 	for (Bone* Bone : Char->Bones) {
 
-		Bone->AnimInfo = new AnimationManagerInfo();
-		Bone->AnimInfo->Blocking = BlockingInfo::GetAllUnblocked();
+		Bone->AnimCtx = new AnimationContext();
+		Bone->AnimCtx->Blocking = BlockingInfo::GetAllUnblocked();
 		Bone->PhysicBody->setDamping(1, 1);
 	}
 }
@@ -24,81 +24,63 @@ void AnimationManager::Initialize(void) {
 void AnimationManager::Tick(double dt) {
 
 	PhysicsManager::GetInstance().Tick(dt);
+
+	Form::GetInstance().UpdatePositionAndAngles();
 }
 
 void AnimationManager::InverseKinematic(Bone* Bone, vec3 LocalPoint, vec3 WorldDestPoint) {
 
-	PhysicsManager::GetInstance().SetIKConstraint(Bone->PhysicBody, LocalPoint, WorldDestPoint);
+	PhysicsManager::GetInstance().SetPinpoint(IKPinpoint, Bone->PhysicBody, LocalPoint, WorldDestPoint);
 }
 
 void AnimationManager::CancelInverseKinematic(void)
 {
-	PhysicsManager::GetInstance().SetIKConstraint(nullptr, {}, {});
+	PhysicsManager::GetInstance().SetPinpoint(IKPinpoint, nullptr, {}, {});
 }
 
 BlockingInfo AnimationManager::GetBoneBlocking(Bone* Bone)
 {
 	if (Bone != nullptr)
-		return Bone->AnimInfo->Blocking;
+		return Bone->AnimCtx->Blocking;
 	else
 		return BlockingInfo::GetAllUnblocked();
 }
 
 void AnimationManager::SetBoneBlocking(Bone* Bone, BlockingInfo Blocking)
 {
-	Bone->AnimInfo->Blocking = Blocking;
+	Form::UpdateLock Lock;
+
+	Bone->AnimCtx->Blocking = Blocking;
 
 	PhysicsManager::GetInstance().ChangeObjectMass(Bone->PhysicBody, Blocking.IsFullyBlocked() ? 0 : Bone->Mass);
 
 	Bone->PhysicBody->setLinearFactor(GLMToBullet({ Blocking.XPos ? 1 : 0, Blocking.YPos ? 1 : 0, Blocking.ZPos ? 1 : 0 }));
 	Bone->PhysicBody->setAngularFactor(GLMToBullet({ Blocking.XAxis ? 1 : 0, Blocking.YAxis ? 1 : 0, Blocking.ZAxis ? 1 : 0 }));
+
+	Form::GetInstance().UpdateBlocking();
 }
 
 bool AnimationManager::IsBonePositionConstrained(Bone* Bone)
 {
-	return Bone->AnimInfo->PositionConstraint != nullptr;
+	return Bone->AnimCtx->Pinpoint.IsActive();
 }
 
 void AnimationManager::ConstrainBonePosition(Bone* Bone, vec3 WorldPoint)
 {
-	if (IsBonePositionConstrained(Bone))
-		RemoveBonePositionConstraint(Bone);
-
-	if (Bone->AnimInfo->ConstraintDummy == nullptr)
-		Bone->AnimInfo->ConstraintDummy = PhysicsManager::GetInstance().AddStaticNonSolidBox(mat4(1.0f), {});
-
-	mat4 PositionTransform = translate(mat4(1.0f), WorldPoint);
-	Bone->AnimInfo->ConstraintDummy->setWorldTransform(GLMToBullet(PositionTransform));
-
-	btPoint2PointConstraint* Constraint;
-
 	vec3 LocalPoint = inverse(Bone->WorldTransform * Bone->MiddleTranslation) * vec4(WorldPoint, 1);
 
-	Constraint = new btPoint2PointConstraint(*Bone->AnimInfo->ConstraintDummy, *Bone->PhysicBody, GLMToBullet(vec3(0)), GLMToBullet(LocalPoint));
-
-	Constraint->setParam(BT_CONSTRAINT_STOP_CFM, 0.5f);
-	Constraint->setParam(BT_CONSTRAINT_STOP_ERP, 0.1f);
-
-	btDiscreteDynamicsWorld* World = PhysicsManager::GetInstance().GetWorld();
-	World->addConstraint(Constraint);
-
-	Bone->AnimInfo->PositionConstraint = Constraint;
+	PhysicsManager::GetInstance().SetPinpoint(Bone->AnimCtx->Pinpoint, Bone->PhysicBody, LocalPoint, WorldPoint);
 }
 
 void AnimationManager::RemoveBonePositionConstraint(Bone* Bone)
 {
-	if (IsBonePositionConstrained(Bone)) {
-
-		btDiscreteDynamicsWorld* World =  PhysicsManager::GetInstance().GetWorld();
-		World->removeConstraint(Bone->AnimInfo->PositionConstraint);
-
-		delete Bone->AnimInfo->PositionConstraint;
-		Bone->AnimInfo->PositionConstraint = nullptr;
-	}
+	PhysicsManager::GetInstance().SetPinpoint(Bone->AnimCtx->Pinpoint, nullptr, {}, {});
 }
 
 void AnimationManager::BlockEverythingExceptThisBranch(Bone* Parent, Bone* Exception)
 {
+	Form::UpdateLock Lock;
+
 	if (Parent == nullptr)
 		return;
 
@@ -125,6 +107,62 @@ void AnimationManager::UnblockAllBones(void)
 
 	for (Bone* Bone : Char->Bones)
 		SetBoneBlocking(Bone, AllUnblocked);
+}
+
+void AnimationManager::Serialize(AnimationSerializedState& State)
+{
+	State.Contexts.clear();
+
+	Character* Char = CharacterManager::GetInstance().GetCharacter();
+	for (Bone* Bone : Char->Bones) {
+
+		SerializedAnimationContext SerializedContext;
+
+		SerializedContext.BoneName = Bone->Name;
+
+		SerializedContext.Blocking.XPos  = Bone->AnimCtx->Blocking.XPos;
+		SerializedContext.Blocking.YPos  = Bone->AnimCtx->Blocking.YPos;
+		SerializedContext.Blocking.ZPos  = Bone->AnimCtx->Blocking.ZPos;
+																  
+		SerializedContext.Blocking.XAxis = Bone->AnimCtx->Blocking.XAxis;
+		SerializedContext.Blocking.YAxis = Bone->AnimCtx->Blocking.YAxis;
+		SerializedContext.Blocking.ZAxis = Bone->AnimCtx->Blocking.ZAxis;
+
+		SerializedContext.IsActive = Bone->AnimCtx->Pinpoint.IsActive();
+		SerializedContext.SrcLocalPoint = Bone->AnimCtx->Pinpoint.SrcLocalPoint;
+		SerializedContext.DestWorldPoint = Bone->AnimCtx->Pinpoint.DestWorldPoint;
+
+		State.Contexts.push_back(SerializedContext);
+	}
+}
+
+void AnimationManager::Deserialize(AnimationSerializedState& State)
+{
+	Form::UpdateLock Lock;
+
+	Character* Char = CharacterManager::GetInstance().GetCharacter();
+
+	for (SerializedAnimationContext SerializedContext : State.Contexts) {
+
+		Bone* Bone = Char->FindBone(SerializedContext.BoneName);
+		if (Bone == nullptr)
+			continue;
+
+		BlockingInfo Blocking;
+
+		Blocking.XPos  = SerializedContext.Blocking.XPos;
+		Blocking.YPos  = SerializedContext.Blocking.YPos;
+		Blocking.ZPos  = SerializedContext.Blocking.ZPos;
+
+		Blocking.XAxis = SerializedContext.Blocking.XAxis;
+		Blocking.YAxis = SerializedContext.Blocking.YAxis;
+		Blocking.ZAxis = SerializedContext.Blocking.ZAxis;
+
+		SetBoneBlocking(Bone, Blocking);
+
+		PhysicsManager::GetInstance().SetPinpoint(Bone->AnimCtx->Pinpoint, SerializedContext.IsActive ? Bone->PhysicBody : nullptr, 
+			SerializedContext.SrcLocalPoint, SerializedContext.DestWorldPoint);
+	}
 }
 
 void AnimationManager::PhysicsPreSolve(void) {

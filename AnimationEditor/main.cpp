@@ -1,3 +1,4 @@
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #include "ExternalGUI.hpp"
@@ -67,11 +68,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	aegSetIdleCallback(Idle);
 
 	CharacterManager::GetInstance().Initialize();
+
+	InputManager::GetInstance().Initialize();
 	HWND WindowHandle = Form::GetInstance().Initialize(hInstance);
+
+	InputManager::GetInstance().SetWindow(WindowHandle);
+
 	Render::GetInstance().Initialize(WindowHandle);
 	PhysicsManager::GetInstance().Initialize();
 	AnimationManager::GetInstance().Initialize();
-	InputManager::GetInstance().Initialize(WindowHandle);
 
 	LastTick = GetTime();
 	aegRun();

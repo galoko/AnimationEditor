@@ -29,6 +29,8 @@ void Render::DrawScene(void) {
 	DrawCharacter(Char);
 
 	// DrawCharacterGrid();
+	
+	DrawAxes();
 
 	DrawPickedPoint();
 
@@ -58,6 +60,16 @@ void Render::DrawCharacter(Character* Char) {
 		SetColors(Color);
 
 		DrawCube(Bone->WorldTransform * Bone->MiddleTranslation, Bone->Size);
+
+		if (Bone->AnimCtx->Pinpoint.IsActive()) {
+
+			SetWireframeMode(true);
+			SetColors({ 0, 0, 1, 0.7 });
+
+			DrawSphere(Bone->AnimCtx->Pinpoint.DestWorldPoint, mat4(1.0f), vec3(0.04f));
+
+			SetWireframeMode(false);
+		}
 	}
 
 	EnableLighting(false);
@@ -102,7 +114,7 @@ void Render::DrawPickedPoint(void) {
 	SetWireframeMode(true);
 	SetColors({ 1, 0, 0, 0.7 });
 
-	DrawSphere(Selection.WorldPoint, mat4(1.0f), vec3(0.05f));
+	DrawSphere(Selection.GetWorldPoint(), mat4(1.0f), vec3(0.05f));
 
 	if (State == InverseKinematic) {
 
@@ -111,7 +123,7 @@ void Render::DrawPickedPoint(void) {
 		SetWireframeMode(false);
 		SetColors({ 0, 0, 0.5, 0.5 });
 
-		DrawPlane(Selection.WorldPoint, PlaneNormal, vec3(1.0f));
+		DrawPlane(Selection.GetWorldPoint(), PlaneNormal, vec3(1.0f));
 	}
 }
 
@@ -121,6 +133,21 @@ void Render::DrawCharacterGrid(void) {
 	EnableLighting(false);
 	SetColors({ 0, 0.7, 0, 0.5 });
 	DrawGrid({}, 2, 0.5f);
+}
+
+void Render::DrawAxes(void) {
+
+	SetWireframeMode(false);
+	EnableLighting(false);
+
+	SetColors({ 1, 0, 0, 1 });
+	DrawLine({ -1, 0, 0 }, { 1, 0, 0 });
+
+	SetColors({ 0, 1, 0, 1 });
+	DrawLine({ 0, -1, 0 }, { 0, 1, 0 });
+
+	SetColors({ 0, 0, 1, 1 });
+	DrawLine({ 0, 0, -1 }, { 0, 0, 1 });
 }
 
 // Controls API
@@ -208,6 +235,22 @@ void Render::GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& Wo
 	GetPointAndDirectionFromScreenPoint(x, y, Point, Direction);
 
 	return PhysicsManager::GetInstance().GetBoneFromRay(Point, Direction, TouchedBone, WorldPoint, WorldNormal);
+}
+
+void Render::Serialize(RenderSerializedState & State)
+{
+	State.CameraPosition = CameraPosition;
+	State.CameraAngleX = CameraAngleX;
+	State.CameraAngleZ = CameraAngleZ;
+}
+
+void Render::Deserialize(RenderSerializedState & State)
+{
+	CameraPosition = State.CameraPosition;
+	CameraAngleX = State.CameraAngleX;
+	CameraAngleZ = State.CameraAngleZ;
+
+	UpdateViewMatrix();
 }
 
 // Primitives

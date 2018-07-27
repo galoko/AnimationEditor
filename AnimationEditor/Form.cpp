@@ -2,6 +2,9 @@
 
 #include <WindowsX.h>
 
+#include <iomanip>
+#include <sstream>
+
 #include "Render.hpp"
 #include "InputManager.hpp"
 #include "AnimationManager.hpp"
@@ -43,7 +46,8 @@ HWND Form::Initialize(HINSTANCE hInstance) {
 	aegSetButtonCallback(ButtonStaticCallback);
 	aegSetCheckBoxCallback(CheckBoxStaticCallback);
 
-	SetupDefaultValues();
+	UpdateBlocking();
+	UpdatePositionAndAngles();
 
 	return WindowHandle;
 }
@@ -162,7 +166,7 @@ void Form::ButtonCallback(const wstring Name)
 
 		if (Selection.HaveBone())
 			if (!AnimationManager::GetInstance().IsBonePositionConstrained(Selection.Bone))
-				AnimationManager::GetInstance().ConstrainBonePosition(Selection.Bone, Selection.WorldPoint);
+				AnimationManager::GetInstance().ConstrainBonePosition(Selection.Bone, Selection.GetWorldPoint());
 			else
 				AnimationManager::GetInstance().RemoveBonePositionConstraint(Selection.Bone);
 	}
@@ -200,31 +204,28 @@ void Form::CheckBoxCallback(const wstring Name, bool IsChecked)
 		AnimationManager::GetInstance().SetBoneBlocking(Bone, Blocking);
 }
 
-void Form::SetupDefaultValues(void)
-{	
-	aegSetEnabled(CONSTRAIN_POSITION, false);
-	aegSetEnabled(X_POS,  false);
-	aegSetEnabled(Y_POS,  false);
-	aegSetEnabled(Z_POS,  false);
-	aegSetEnabled(X_AXIS, false);
-	aegSetEnabled(Y_AXIS, false);
-	aegSetEnabled(Z_AXIS, false);
-
-	aegSetChecked(X_POS,  true);
-	aegSetChecked(Y_POS,  true);
-	aegSetChecked(Z_POS,  true);
-	aegSetChecked(X_AXIS, true);
-	aegSetChecked(Y_AXIS, true);
-	aegSetChecked(Z_AXIS, true);
-}
-
 void Form::UpdateBlocking(void)
 {
 	CheckFormUpdateBlock(IsBlockingUpdatePending);
 
 	InputSelection Selection = InputManager::GetInstance().GetSelection();
 	if (!Selection.HaveBone()) {
-		SetupDefaultValues();
+
+		aegSetEnabled(CONSTRAIN_POSITION, false);
+		aegSetEnabled(X_POS,  false);
+		aegSetEnabled(Y_POS,  false);
+		aegSetEnabled(Z_POS,  false);
+		aegSetEnabled(X_AXIS, false);
+		aegSetEnabled(Y_AXIS, false);
+		aegSetEnabled(Z_AXIS, false);
+
+		aegSetEnabled(X_POS_INPUT,   false);
+		aegSetEnabled(Y_POS_INPUT,   false);
+		aegSetEnabled(Z_POS_INPUT,   false);
+		aegSetEnabled(X_ANGLE_INPUT, false);
+		aegSetEnabled(Y_ANGLE_INPUT, false);
+		aegSetEnabled(Z_ANGLE_INPUT, false);
+
 		return;
 	}
 
@@ -237,6 +238,13 @@ void Form::UpdateBlocking(void)
 	aegSetEnabled(Y_AXIS, true);
 	aegSetEnabled(Z_AXIS, true);
 
+	aegSetEnabled(X_POS_INPUT,   true);
+	aegSetEnabled(Y_POS_INPUT,   true);
+	aegSetEnabled(Z_POS_INPUT,   true);
+	aegSetEnabled(X_ANGLE_INPUT, true);
+	aegSetEnabled(Y_ANGLE_INPUT, true);
+	aegSetEnabled(Z_ANGLE_INPUT, true);
+
 	BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
 
 	aegSetChecked(X_POS,  Blocking.XPos);
@@ -245,6 +253,70 @@ void Form::UpdateBlocking(void)
 	aegSetChecked(X_AXIS, Blocking.XAxis);
 	aegSetChecked(Y_AXIS, Blocking.YAxis);
 	aegSetChecked(Z_AXIS, Blocking.ZAxis);
+}
+
+void Form::UpdatePositionAndAngles(void)
+{
+	InputSelection Selection = InputManager::GetInstance().GetSelection();
+	if (!Selection.HaveBone()) {
+
+		aegSetChecked(X_POS,  true);
+		aegSetChecked(Y_POS,  true);
+		aegSetChecked(Z_POS,  true);
+		aegSetChecked(X_AXIS, true);
+		aegSetChecked(Y_AXIS, true);
+		aegSetChecked(Z_AXIS, true);
+
+		aegSetText(X_POS_INPUT,   L"");
+		aegSetText(Y_POS_INPUT,   L"");
+		aegSetText(Z_POS_INPUT,   L"");
+		aegSetText(X_ANGLE_INPUT, L"");
+		aegSetText(Y_ANGLE_INPUT, L"");
+		aegSetText(Z_ANGLE_INPUT, L"");
+
+		return;
+	}
+
+	vec3 WorldPoint = (Selection.Bone->WorldTransform * Selection.Bone->MiddleTranslation) * vec4(0, 0, 0, 1); // to cm
+	WorldPoint *= 100.0f;
+
+	wstringstream StringStream;
+
+	StringStream.str(L"");
+	StringStream << fixed << setprecision(3) << WorldPoint.x;
+	wstring XPos = StringStream.str();
+
+	StringStream.str(L"");
+	StringStream << fixed << setprecision(3) << WorldPoint.y;
+	wstring YPos = StringStream.str();
+
+	StringStream.str(L"");
+	StringStream << fixed << setprecision(3) << WorldPoint.z;
+	wstring ZPos = StringStream.str();
+
+	quat Q = quat_cast(Selection.Bone->Rotation);
+	vec3 Angles = eulerAngles(Q);
+
+	StringStream.str(L"");
+	StringStream << fixed << setprecision(2) << degrees(Angles.x);
+	wstring XAngle = StringStream.str();
+
+	StringStream.str(L"");
+	StringStream << fixed << setprecision(2) << degrees(Angles.y);
+	wstring YAngle = StringStream.str();
+
+	StringStream.str(L"");
+	StringStream << fixed << setprecision(2) << degrees(Angles.z);
+	wstring ZAngle = StringStream.str();
+
+	aegSetText(X_POS_INPUT, XPos.c_str());
+	aegSetText(Y_POS_INPUT, YPos.c_str());
+	aegSetText(Z_POS_INPUT, ZPos.c_str());
+
+	aegSetText(X_ANGLE_INPUT, XAngle.c_str());
+	aegSetText(Y_ANGLE_INPUT, YAngle.c_str());
+	aegSetText(Z_ANGLE_INPUT, ZAngle.c_str());
+
 }
 
 void Form::ProcessPendingUpdates(void)

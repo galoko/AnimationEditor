@@ -1,10 +1,13 @@
 #pragma once
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #include <glm/glm.hpp>
 
 #include "Character.hpp"
+#include "PhysicsManager.hpp"
+#include "SerializationManager.hpp"
 
 using namespace glm;
 
@@ -18,18 +21,19 @@ typedef struct BlockingInfo {
 	static BlockingInfo GetAllUnblocked(void);
 } BlockingInfo;
 
-typedef struct AnimationManagerInfo {
-
-	btPoint2PointConstraint* PositionConstraint;
-	btRigidBody* ConstraintDummy;
-
+typedef struct AnimationContext {
+	friend class AnimationManager;
+private:
 	BlockingInfo Blocking;
-
-} AnimationManagerInfo;
+public:
+	PhysicsManager::Pinpoint Pinpoint;
+} AnimationContext;
 
 typedef class AnimationManager {
 private:
 	AnimationManager(void) { };
+
+	PhysicsManager::Pinpoint IKPinpoint;
 
 	void PhysicsPreSolve(void);
 public:
@@ -57,4 +61,7 @@ public:
 
 	void BlockEverythingExceptThisBranch(Bone* Parent, Bone* Exception);
 	void UnblockAllBones(void);
+
+	void Serialize(AnimationSerializedState& State);
+	void Deserialize(AnimationSerializedState& State);
 } AnimationManager;

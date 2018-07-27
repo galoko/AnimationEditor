@@ -7,15 +7,19 @@
 #include "CharacterManager.hpp"
 #include "Form.hpp"
 
-void InputManager::Initialize(HWND WindowHandle) {
+void InputManager::Initialize(void) {
 
+}
+
+void InputManager::SetWindow(HWND WindowHandle)
+{
 	this->WindowHandle = WindowHandle;
 
 	RAWINPUTDEVICE Rid[1] = {};
 
 	Rid[0].usUsagePage = 0x01;
 	Rid[0].usUsage = 0x02;
-	Rid[0].dwFlags = RIDEV_INPUTSINK;  
+	Rid[0].dwFlags = RIDEV_INPUTSINK;
 	Rid[0].hwndTarget = WindowHandle;
 
 	if (!RegisterRawInputDevices(Rid, 1, sizeof(Rid[0])))
@@ -27,7 +31,7 @@ void InputManager::Tick(double dt) {
 	ProcessKeyboardInput(dt);
 
 	if (State == InverseKinematic && Selection.HaveBone())
-		AnimationManager::GetInstance().InverseKinematic(Selection.Bone, Selection.LocalPoint, Selection.WorldPoint);
+		AnimationManager::GetInstance().InverseKinematic(Selection.Bone, Selection.LocalPoint, Selection.GetWorldPoint());
 }
 
 void InputManager::SetFocus(bool IsInFocusNow) {
@@ -73,7 +77,7 @@ void InputManager::ProcessMouseLockState(void)
 		IsMouseLockEnforced = false;
 
 		if (State == InverseKinematic && Selection.HaveBone()) 
-			SetCursorToWorldPoint(Selection.WorldPoint);
+			SetCursorToWorldPoint(Selection.GetWorldPoint());
 	}
 }
 
@@ -112,9 +116,10 @@ void InputManager::SelectBoneAtScreenPoint(LONG x, LONG y) {
 
 		Selection.Bone = SelectedBone;
 		Selection.LocalPoint = inverse(SelectedBone->WorldTransform * SelectedBone->MiddleTranslation) * vec4(WorldPoint, 1);
-		Selection.WorldPoint = WorldPoint;
+		Selection.SetWorldPoint(WorldPoint);
 
 		Form::GetInstance().UpdateBlocking();
+		Form::GetInstance().UpdatePositionAndAngles();
 	}
 }
 
@@ -126,6 +131,7 @@ void InputManager::CancelSelection(void) {
 		AnimationManager::GetInstance().CancelInverseKinematic();
 
 	Form::GetInstance().UpdateBlocking();
+	Form::GetInstance().UpdatePositionAndAngles();
 }
 
 void InputManager::ProcessCameraMovement(double dt)
@@ -176,17 +182,17 @@ void InputManager::SetWorldPointToScreePoint(LONG x, LONG y) {
 	float c = dot(Direction, PlaneNormal);
 	if (fabs(c) > 10e-7) {
 
-		float t = -(dot(Point, PlaneNormal) - dot(Selection.WorldPoint, PlaneNormal)) / c;
+		float t = -(dot(Point, PlaneNormal) - dot(Selection.GetWorldPoint(), PlaneNormal)) / c;
 		vec3 P = Point + t * Direction;
 
-		Selection.WorldPoint = P;
+		Selection.SetWorldPoint(P);
 	}
 }
 
 void InputManager::SetCursorToWorldPoint(vec3 WorldPoint)
 {
 	LONG x, y;
-	Render::GetInstance().GetScreenPointFromPoint(Selection.WorldPoint, x, y);
+	Render::GetInstance().GetScreenPointFromPoint(Selection.GetWorldPoint(), x, y);
 
 	POINT ScreenPoint = { x, y };
 	ClientToScreen(WindowHandle, &ScreenPoint);
@@ -219,9 +225,14 @@ void InputManager::ProcessKeyboardInput(double dt) {
 			State = None;
 	}
 
-	if (WasPressed('Q') && State == None) {
-		SetCursorToWorldPoint(Selection.WorldPoint);
-		State = InverseKinematic;
+	if (WasPressed('Q')) {
+		if (State == None) {
+			SetCursorToWorldPoint(Selection.GetWorldPoint());
+			State = InverseKinematic;
+		}
+		else
+		if (State == InverseKinematic)
+			State = None;
 	}
 
 	if (WasPressed('R') && Selection.HaveBone()) {
@@ -238,6 +249,18 @@ void InputManager::ProcessKeyboardInput(double dt) {
 
 			AnimationManager::GetInstance().SetBoneBlocking(Selection.Bone, Blocking);
 		}
+	}
+
+	if (WasPressed(VK_F5)) {
+		CompleteSerializedState SavedState;
+		SerializationManager::GetInstance().Serialize(SavedState);
+		SerializationManager::GetInstance().SaveToFile(SavedState, L"H:\\test.xml");
+	}
+
+	if (WasPressed(VK_F9)) {
+		CompleteSerializedState SavedState;
+		SerializationManager::GetInstance().LoadFromFile(SavedState, L"H:\\test.xml");
+		SerializationManager::GetInstance().Deserialize(SavedState);
 	}
 
 	if (WasPressed('P'))
@@ -289,6 +312,38 @@ void InputManager::ProcessKeyboardEvent(void) {
 
 void InputManager::ProcessMouseWheelEvent(float Delta) {
 
+	if (State == InverseKinematic && Selection.HaveBone()) {
+
+		vec3 PlaneNormal = GetPlaneNormal();
+
+		Selection.SetWorldPoint(Selection.GetWorldPoint() - PlaneNormal * 0.05f * Delta);
+		
+		SetCursorToWorldPoint(Selection.GetWorldPoint());
+	}
+}
+
+void InputManager::Serialize(InputSerializedState& State)
+{
+	State.State = (uint32)this->State;
+	State.PlaneMode = (uint32)this->PlaneMode;
+
+	State.BoneName = Selection.HaveBone() ? Selection.Bone->Name : L"";
+	State.LocalPoint = Selection.LocalPoint;
+	State.WorldPoint = Selection.GetWorldPoint();
+}
+
+void InputManager::Deserialize(InputSerializedState& State)
+{
+	Character* Char = CharacterManager::GetInstance().GetCharacter();
+
+	this->State = (InputState)State.State;
+	this->PlaneMode = (enum PlaneMode)State.PlaneMode;
+
+	Selection.Bone = State.BoneName != L"" ? Char->FindBone(State.BoneName) : nullptr;
+	Selection.LocalPoint = State.LocalPoint;
+	Selection.SetWorldPoint(State.WorldPoint);
+
+	SetCursorToWorldPoint(Selection.GetWorldPoint());
 }
 
 // General API
@@ -317,6 +372,22 @@ void InputManager::UpdateKeyboardState(void)
 }
 
 // InputSelection
+
+vec3 InputSelection::GetWorldPoint(void)
+{
+	return WorldPoint;
+}
+
+void InputSelection::SetWorldPoint(vec3 WorldPoint)
+{
+	const float BoxSize = 3.0f;
+
+	WorldPoint.x = max(-BoxSize, min(WorldPoint.x, BoxSize));
+	WorldPoint.y = max(-BoxSize, min(WorldPoint.y, BoxSize));
+	WorldPoint.z = max(-BoxSize, min(WorldPoint.z, BoxSize));
+
+	this->WorldPoint = WorldPoint;
+}
 
 bool InputSelection::HaveBone(void)
 {

@@ -1,6 +1,11 @@
 #pragma once
 
+#include <glm/glm.hpp>
+
 #include "Character.hpp"
+#include "SerializationManager.hpp"
+
+using namespace glm;
 
 typedef class CharacterManager {
 private:
@@ -19,4 +24,8 @@ public:
 
 	void Initialize(void);
 	Character* GetCharacter(void);
+
+	void Serialize(CharacterSerializedState& State);
+	void Deserialize(CharacterSerializedState& State);
+
 } CharacterManager;

@@ -1,10 +1,12 @@
 #pragma once
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #include <glm/glm.hpp>
 
 #include "Character.hpp"
+#include "SerializationManager.hpp"
 
 using namespace glm;
 
@@ -15,8 +17,14 @@ typedef enum InputState {
 } InputState;
 
 typedef struct InputSelection {
+private:
+	vec3 WorldPoint;
+public:
 	Bone* Bone;
-	vec3 LocalPoint, WorldPoint;
+	vec3 LocalPoint;
+
+	vec3 GetWorldPoint(void);
+	void SetWorldPoint(vec3 WorldPoint);
 
 	bool HaveBone(void);
 } InputSelection;
@@ -29,17 +37,18 @@ private:
 
 	BYTE LastKeyboardState[256], CurrentKeyboardState[256];
 	LONG MouseX, MouseY;
-	bool IsInFocus;
+	bool IsInFocus, IsMouseLockEnforced, IsCameraMode;
 
 	InputState State;
-	bool IsMouseLockEnforced, IsCameraMode;
 
-	enum {
+	typedef enum PlaneMode {
 		PlaneCamera,
 		PlaneX,
 		PlaneY,
 		PlaneZ
 	} PlaneMode;
+
+	PlaneMode PlaneMode;
 
 	InputSelection Selection;
 
@@ -70,7 +79,8 @@ public:
 	InputManager(InputManager const&) = delete;
 	void operator=(InputManager const&) = delete;
 	
-	void Initialize(HWND WindowHandle);
+	void Initialize(void);
+	void SetWindow(HWND WindowHandle);
 
 	void Tick(double dt);
 	void SetFocus(bool IsInFocusNow);
@@ -83,4 +93,7 @@ public:
 	void ProcessMouseFormEvent(LONG x, LONG y);
 	void ProcessKeyboardEvent(void);
 	void ProcessMouseWheelEvent(float Delta);
+
+	void Serialize(InputSerializedState& State);
+	void Deserialize(InputSerializedState& State);
 } InputManager;

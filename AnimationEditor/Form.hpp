@@ -35,8 +35,6 @@ private:
 	void ButtonCallback(const wstring Name);
 	static void __stdcall CheckBoxStaticCallback(const wchar_t* Name, bool IsChecked);
 	void CheckBoxCallback(const wstring Name, bool IsChecked);
-
-	void SetupDefaultValues(void);
 public:
 	static Form& GetInstance(void) {
 		static Form Instance;
@@ -62,4 +60,5 @@ public:
 	} UpdateLock;
 
 	void UpdateBlocking(void);
+	void UpdatePositionAndAngles(void);
 } Form;

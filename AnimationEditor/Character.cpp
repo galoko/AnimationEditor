@@ -52,13 +52,13 @@ void Character::GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 Mirror
 
 	NormalizeLimits(&LowLimit, &HighLimit);
 
-	Bone* RightBone = new Bone(NextBoneID++, LeftBone->Name + L" Right", 
+	Bone* RightBone = new Bone(NextBoneID++, L"Right " + LeftBone->Name,
 		LeftBone->Offset * MirrorVector, LeftBone->Tail * MirrorVector, LeftBone->Size,
 		LowLimit, HighLimit, LeftBone->LogicalDirection * MirrorVector, RightParent);
 
 	Bones.push_back(RightBone);
 
-	LeftBone->Name = LeftBone->Name + L" Left";
+	LeftBone->Name = L"Left " + LeftBone->Name;
 
 	for (Bone* LeftChild : LeftBone->Childs)
 		GenerateRightSide(LeftChild, RightBone, MirrorDirection);
@@ -110,8 +110,8 @@ void Character::GenerateBones(void)
 		{    0,    0,  165 }, 
 		{ 0, 0, 1 }, L"Lower Arm");
 	Bone* Hand = GenerateBone(LowerArm, { 0, 1, 0, }, { 3.5f, 15.0f, 1.5f }, { 0, 1, 0 }, 
-		{  -70,  -90,  -35 }, 
-		{   80,   45,   35 }, 
+		{  -70,  -80,  -35 }, 
+		{   90,   90,   35 }, 
 		{ 0, 0, -1 }, L"Hand");
 
 	GenerateRightSide(UpperArm, UpperArm->Parent, { 0, 1, 0 });

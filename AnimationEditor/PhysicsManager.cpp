@@ -9,21 +9,21 @@
 
 void PhysicsManager::Initialize(void)
 {
-	btBroadphaseInterface* broadphase = new btDbvtBroadphase();
+	btBroadphaseInterface* Broadphase = new btDbvtBroadphase();
 
-	btDefaultCollisionConfiguration* collisionConfiguration = new btDefaultCollisionConfiguration();
-	btCollisionDispatcher* dispatcher = new btCollisionDispatcher(collisionConfiguration);
+	btDefaultCollisionConfiguration* CollisionConfiguration = new btDefaultCollisionConfiguration();
+	btCollisionDispatcher* Dispatcher = new btCollisionDispatcher(CollisionConfiguration);
 
-	btSequentialImpulseConstraintSolver* solver = new btSequentialImpulseConstraintSolver;
+	btSequentialImpulseConstraintSolver* Solver = new btSequentialImpulseConstraintSolver;
 
-	World = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+	World = new btDiscreteDynamicsWorld(Dispatcher, Broadphase, Solver, CollisionConfiguration);
 	World->setGravity(btVector3(0, 0, 0));
 
 	btOverlapFilterCallback* filterCallback = new YourOwnFilterCallback();
 	World->getPairCache()->setOverlapFilterCallback(filterCallback);
 
-	btContactSolverInfo& Solver = World->getSolverInfo();
-	Solver.m_numIterations = 30;
+	btContactSolverInfo& SolverInfo = World->getSolverInfo();
+	SolverInfo.m_numIterations = 30;
 
 	CreateFloor(4.0f, 100.0f);
 
@@ -201,10 +201,8 @@ void PhysicsManager::Tick(double dt) {
 	uint64 StepCount = (uint64)(PhysicsTime * PHYSICS_FPS);
 
 	// skip steps (especially useful after breakpoint wake up)
-	/*
 	if (DoneStepCount + MaxStepsPerTick < StepCount)
 		DoneStepCount = StepCount - MaxStepsPerTick;
-	*/
 
 	for (; DoneStepCount < StepCount; DoneStepCount++) {
 
@@ -229,6 +227,16 @@ void PhysicsManager::SyncCharacterWithWorld(void) {
 		Bone->WorldTransform = GetBoneWorldTransform(Bone);
 
 	Char->UpdateRotationsFromWorldTransforms();
+}
+
+void PhysicsManager::SyncWorldWithCharacter(void)
+{
+	Character* Char = CharacterManager::GetInstance().GetCharacter();
+	Char->UpdateWorldTranforms();
+
+	// apply changes to bones
+	for (Bone* Bone : Char->Bones)
+		Bone->PhysicBody->setWorldTransform(GLMToBullet(Bone->WorldTransform * Bone->MiddleTranslation));
 }
 
 btRigidBody* PhysicsManager::AddDynamicBox(mat4 Transform, vec3 Size, float Mass)
@@ -267,13 +275,6 @@ btRigidBody* PhysicsManager::AddStaticBox(mat4 Transform, vec3 Size)
 	return AddDynamicBox(Transform, Size, 0.0f);
 }
 
-btRigidBody* PhysicsManager::AddStaticNonSolidBox(mat4 Transform, vec3 Size)
-{
-	btRigidBody* Body = AddStaticBox(Transform, Size);
-	Body->setUserPointer((void*)NON_SOLID_ID);
-	return Body;
-}
-
 vec3 PhysicsManager::GetFloorPosition(void)
 {
 	return FloorPosition;
@@ -309,50 +310,55 @@ void PhysicsManager::GetBoneFromRay(vec3 RayStart, vec3 RayDirection, Bone*& Tou
 	}
 }
 
-void PhysicsManager::SetIKConstraint(btRigidBody* Body, vec3 LocalPoint, vec3 WorldPoint)
+void PhysicsManager::SetPinpoint(Pinpoint& P, btRigidBody* Body, vec3 LocalPoint, vec3 WorldPoint)
 {
-	if (IKDestDummy == nullptr)
-		IKDestDummy = AddStaticNonSolidBox(mat4(1.0f), {});
+	if (Body != P.SrcBody && P.Constraint != nullptr) {
+		World->removeConstraint(P.Constraint);
+		delete P.Constraint;
+		P.Constraint = nullptr;
+	}
 
-	if (Body != IKSourceBody) {
+	P.SrcBody = Body;
 
-		if (IKConstraint != nullptr) {
-			World->removeConstraint(IKConstraint);
-			delete IKConstraint;
-			IKConstraint = nullptr;
+	if (Body == nullptr) {
+
+		if (P.DummyBody != nullptr) {
+			World->removeRigidBody(P.DummyBody);
+			delete P.DummyBody;
+			P.DummyBody = nullptr;
 		}
+
+		return;
 	}
 
-	IKSourceBody = Body;
-
-	if (IKConstraint == nullptr) {
-
-		if (IKSourceBody == nullptr)
-			return;
-
-		IKConstraint = new btPoint2PointConstraint(*IKDestDummy, *IKSourceBody, GLMToBullet(vec3(0, 0, 0)), GLMToBullet(vec3(0, 0, 0)));
-
-		IKConstraint->setParam(BT_CONSTRAINT_STOP_CFM, 0.5f);
-		IKConstraint->setParam(BT_CONSTRAINT_STOP_ERP, 0.1f);
-
-		World->addConstraint(IKConstraint);
+	if (P.DummyBody == nullptr) {
+		P.DummyBody = AddStaticBox(mat4(1.0f), {});
+		P.DummyBody->setUserPointer((void*)NON_SOLID_ID);
 	}
 
-	IKConstraint->setPivotB(GLMToBullet(LocalPoint));
+	if (P.Constraint == nullptr) {
 
-	mat4 DestTransform = translate(mat4(1.0f), WorldPoint);
-	IKDestDummy->setWorldTransform(GLMToBullet(DestTransform));
-}
+		P.Constraint = new btPoint2PointConstraint(*P.DummyBody, *P.SrcBody, GLMToBullet(vec3(0, 0, 0)), GLMToBullet(vec3(0, 0, 0)));
 
-btDiscreteDynamicsWorld* PhysicsManager::GetWorld(void)
-{
-	return World;
+		P.Constraint->setParam(BT_CONSTRAINT_STOP_CFM, 0.5f);
+		P.Constraint->setParam(BT_CONSTRAINT_STOP_ERP, 0.1f);
+
+		World->addConstraint(P.Constraint);
+	}
+
+	P.SrcLocalPoint = LocalPoint;
+	P.DestWorldPoint = WorldPoint;
+
+	P.Constraint->setPivotB(GLMToBullet(P.SrcLocalPoint));
+
+	mat4 DestTransform = translate(mat4(1.0f), P.DestWorldPoint);
+	P.DummyBody->setWorldTransform(GLMToBullet(DestTransform));
 }
 
 mat4 PhysicsManager::GetBoneWorldTransform(Bone* Bone)
 {
-	btTransform BulletTransfrom;
-	Bone->PhysicBody->getMotionState()->getWorldTransform(BulletTransfrom);
+	btTransform BulletTransfrom = Bone->PhysicBody->getWorldTransform();
+
 	mat4 WorldTransform = BulletToGLM(BulletTransfrom) * inverse(Bone->MiddleTranslation);
 
 	return WorldTransform;
@@ -442,4 +448,11 @@ namespace psm {
 		return btVector3(v.x, v.y, v.z);
 	}
 
+}
+
+// Pinpoint
+
+bool PhysicsManager::Pinpoint::IsActive(void)
+{
+	return Constraint != nullptr;
 }

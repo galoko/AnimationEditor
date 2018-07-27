@@ -28,6 +28,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PhysicsManager.cpp" />
     <ClCompile Include="Render.cpp" />
+    <ClCompile Include="SerializationManager.cpp" />
     <ClCompile Include="shader.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -39,6 +40,7 @@
     <ClInclude Include="InputManager.hpp" />
     <ClInclude Include="PhysicsManager.hpp" />
     <ClInclude Include="Render.hpp" />
+    <ClInclude Include="SerializationManager.hpp" />
     <ClInclude Include="shader.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -115,15 +117,15 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Projects\Code\Others\bullet3\src;E:\Projects\Code\Others\glm;E:\Projects\Code\Others\glew-2.1.0\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Projects\Code\Others\tinyxml2-ex;E:\Projects\Code\Others\tinyxml2;E:\Projects\Code\Others\bullet3\src;E:\Projects\Code\Others\glm;E:\Projects\Code\Others\glew-2.1.0\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <FloatingPointModel>Precise</FloatingPointModel>
       <PreprocessorDefinitions>BT_THREADSAFE=1;BT_USE_DOUBLE_PRECISION;_DEBUG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>E:\Projects\Code\Others\bullet3\bin;E:\Projects\Code\Others\glew-2.1.0\lib\Release\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>BulletCollision_vs2010_x64_debug.lib;BulletDynamics_vs2010_x64_debug.lib;LinearMath_vs2010_x64_debug.lib;glew32s.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>E:\Projects\Code\Others\tinyxml2\tinyxml2\bin\tinyxml2\x64-Debug-Lib;E:\Projects\Code\Others\bullet3\bin;E:\Projects\Code\Others\glew-2.1.0\lib\Release\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>BulletCollision_vs2010_x64_debug.lib;BulletDynamics_vs2010_x64_debug.lib;LinearMath_vs2010_x64_debug.lib;glew32s.lib;tinyxml2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -148,15 +150,15 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>E:\Projects\Code\Others\bullet3\src;E:\Projects\Code\Others\glm;E:\Projects\Code\Others\glew-2.1.0\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>E:\Projects\Code\Others\tinyxml2-ex;E:\Projects\Code\Others\tinyxml2;E:\Projects\Code\Others\bullet3\src;E:\Projects\Code\Others\glm;E:\Projects\Code\Others\glew-2.1.0\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>BT_THREADSAFE=1;BT_USE_DOUBLE_PRECISION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>E:\Projects\Code\Others\bullet3\bin;E:\Projects\Code\Others\glew-2.1.0\lib\Release\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>BulletCollision_vs2010_x64_release.lib;BulletDynamics_vs2010_x64_release.lib;LinearMath_vs2010_x64_release.lib;glew32s.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>E:\Projects\Code\Others\tinyxml2\tinyxml2\bin\tinyxml2\x64-Release-Lib;E:\Projects\Code\Others\bullet3\bin;E:\Projects\Code\Others\glew-2.1.0\lib\Release\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>BulletCollision_vs2010_x64_release.lib;BulletDynamics_vs2010_x64_release.lib;LinearMath_vs2010_x64_release.lib;glew32s.lib;tinyxml2.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Manifest>
       <AssemblyIdentity>

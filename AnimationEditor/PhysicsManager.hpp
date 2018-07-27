@@ -1,5 +1,6 @@
 #pragma once
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #include <functional>
@@ -54,15 +55,12 @@ private:
 
 	vec3 FloorPosition, FloorSize;
 
-	// IK
-
-	btPoint2PointConstraint* IKConstraint;
-	btRigidBody* IKDestDummy;
-	btRigidBody* IKSourceBody;
-
 	// World
 
 	btDiscreteDynamicsWorld* World;
+
+	btRigidBody* AddDynamicBox(mat4 Transform, vec3 Size, float Mass);
+	btRigidBody* AddStaticBox(mat4 Transform, vec3 Size);
 
 	// Tick Utils
 
@@ -95,13 +93,21 @@ public:
 
 	void GetBoneFromRay(vec3 RayStart, vec3 RayDirection, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal);
 
-	void SetIKConstraint(btRigidBody* Body, vec3 LocalPoint, vec3 WorldPoint);
+	typedef struct Pinpoint {
+		friend class PhysicsManager;
+	private:
+		btPoint2PointConstraint* Constraint;
+		btRigidBody* DummyBody;
+	public:
+		btRigidBody* SrcBody;
+		vec3 SrcLocalPoint, DestWorldPoint;
 
-	btDiscreteDynamicsWorld* GetWorld(void);
+		bool IsActive(void);
+	} Pinpoint;
 
-	btRigidBody* AddDynamicBox(mat4 Transform, vec3 Size, float Mass);
-	btRigidBody* AddStaticBox(mat4 Transform, vec3 Size);
-	btRigidBody* AddStaticNonSolidBox(mat4 Transform, vec3 Size);
+	void SetPinpoint(Pinpoint& P, btRigidBody* Body, vec3 LocalPoint, vec3 WorldPoint);
 
 	static mat4 GetBoneWorldTransform(Bone* Bone);
+
+	void SyncWorldWithCharacter(void);
 } PhysicsManager;

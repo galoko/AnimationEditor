@@ -20,10 +20,18 @@ type
     XAxis: TCheckBox;
     YAxis: TCheckBox;
     ZAxis: TCheckBox;
+    XPosInput: TEdit;
+    YPosInput: TEdit;
+    ZPosInput: TEdit;
+    XAngleInput: TEdit;
+    YAngleInput: TEdit;
+    ZAngleInput: TEdit;
     procedure ApplicationEventsMessage(var Msg: tagMSG; var Handled: Boolean);
     procedure FormCreate(Sender: TObject);
     procedure ButtonClick(Sender: TObject);
     procedure CheckBoxClick(Sender: TObject);
+    procedure EditKeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
   private
     { Private declarations }
     IsInSetMode: Boolean;
@@ -32,6 +40,7 @@ type
 
     ButtonCallback: TButtonCallback;
     CheckBoxCallback: TCheckBoxCallback;
+    EditCallback: TEditCallback;
 
     procedure SetupCallbacks(Component: TComponent);
   public
@@ -39,8 +48,10 @@ type
     procedure SetOpenGLWindow(Window: HWND);
     procedure SetButtonCallback(Callback: TButtonCallback);
     procedure SetCheckBoxCallback(Callback: TCheckBoxCallback);
+    procedure SetEditCallback(Callback: TEditCallback);
     procedure SetEnabled(const Name: String; IsEnabled: Boolean); reintroduce;
     procedure SetChecked(const Name: String; IsChecked: Boolean);
+    procedure SetText(const Name, Text: String);
   end;
 
 var
@@ -63,7 +74,10 @@ begin
     TButton(Component).OnClick:= ButtonClick
   else
   if Component is TCheckBox then
-    TCheckBox(Component).OnClick:= CheckBoxClick;
+    TCheckBox(Component).OnClick:= CheckBoxClick
+  else
+  if Component is TEdit then
+    TEdit(Component).OnKeyDown:= EditKeyDown;
 
   for SubComponent in Component do
     SetupCallbacks(SubComponent);
@@ -89,6 +103,18 @@ begin
     CheckBox:= Sender as TCheckBox;
     CheckBoxCallback(PWideChar(CheckBox.Name), CheckBox.Checked);
   end;
+end;
+
+procedure TAnimationEditorForm.EditKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+var
+  Edit: TEdit;
+begin
+  Edit:= Sender as TEdit;
+
+  if Key = VK_RETURN then
+    if Assigned(EditCallback) then
+      EditCallback(PWideChar(Edit.Name), PWideChar(Edit.Text));
 end;
 
 procedure TAnimationEditorForm.ApplicationEventsMessage(var Msg: tagMSG;
@@ -117,6 +143,11 @@ end;
 procedure TAnimationEditorForm.SetCheckBoxCallback(Callback: TCheckBoxCallback);
 begin
   CheckBoxCallback:= Callback;
+end;
+
+procedure TAnimationEditorForm.SetEditCallback(Callback: TEditCallback);
+begin
+  EditCallback:= Callback;
 end;
 
 procedure TAnimationEditorForm.SetEnabled(const Name: String;
@@ -149,6 +180,25 @@ begin
   begin
     IsInSetMode:= True;
     TCheckBox(Component).Checked:= IsChecked;
+    IsInSetMode:= False;
+  end;
+end;
+
+procedure TAnimationEditorForm.SetText(const Name, Text: String);
+var
+  Component: TComponent;
+begin
+  Component:= FindComponent(Name);
+  if Component = nil then
+    Exit;
+
+  if Component is TEdit then
+  begin
+    if TEdit(Component).Focused then
+      Exit;
+
+    IsInSetMode:= True;
+    TEdit(Component).Text:= Text;
     IsInSetMode:= False;
   end;
 end;

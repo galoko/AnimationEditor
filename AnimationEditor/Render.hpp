@@ -1,5 +1,6 @@
 #pragma once
 
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #define GLEW_STATIC
@@ -8,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include "Character.hpp"
+#include "SerializationManager.hpp"
 
 #pragma comment (lib, "opengl32.lib")
 #pragma comment (lib, "glu32.lib")
@@ -59,6 +61,7 @@ private:
 	void DrawFloor(void);
 	void DrawPickedPoint(void);
 	void DrawCharacterGrid(void);
+	void DrawAxes(void);
 
 	void UpdateViewMatrix(void);
 public:
@@ -90,4 +93,7 @@ public:
 	void GetPointAndDirectionFromScreenPoint(LONG x, LONG y, vec3& Point, vec3& Direction);
 	void GetScreenPointFromPoint(vec3 Point, LONG& x, LONG& y);
 	void GetBoneFromScreenPoint(LONG x, LONG y, Bone*& TouchedBone, vec3& WorldPoint, vec3& WorldNormal);
+
+	void Serialize(RenderSerializedState& State);
+	void Deserialize(RenderSerializedState& State);
 } Render;
