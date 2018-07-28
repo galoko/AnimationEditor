@@ -90,6 +90,7 @@ public:
 	InputState GetState(void);
 	InputSelection GetSelection(void);
 	vec3 GetPlaneNormal(void);
+	void RecalcSelectedWorldPoint(void);
 
 	void ProcessMouseInput(LONG dx, LONG dy);	
 	void ProcessMouseFormEvent(LONG x, LONG y);

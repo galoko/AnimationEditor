@@ -235,6 +235,8 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 			Angles.z = Angle;
 
 		PhysicsManager::GetInstance().SetBoneAngles(Bone, Angles);
+
+		InputManager::GetInstance().RecalcSelectedWorldPoint();
 	}
 }
 
@@ -266,6 +268,8 @@ void Form::TrackBarCallback(const wstring Name, float t)
 			Angles.z = LowLimit.z + (HighLimit.z - LowLimit.z) * t;
 
 		PhysicsManager::GetInstance().SetBoneAngles(Bone, Angles);
+
+		InputManager::GetInstance().RecalcSelectedWorldPoint();
 	}
 }
 
@@ -394,19 +398,15 @@ void Form::UpdatePositionAndAngles(void)
 	aegSetText(Y_POS_INPUT, f2ws(WorldPoint.y, 3).c_str());
 	aegSetText(Z_POS_INPUT, f2ws(WorldPoint.z, 3).c_str());
 
-	if (!isnan(Angles.x)) {
-		aegSetEnabled(X_ANGLE_INPUT, true);
-		aegSetText(X_ANGLE_INPUT, f2ws(degrees(Angles.x), 2).c_str());
+	float LimitLen;
 
-		float LimitLen = HighLimit.x - LowLimit.x;
-		if (LimitLen > 0) {
-			aegSetEnabled(X_AXIS_BAR, true);
-			aegSetPosition(X_AXIS_BAR, (Angles.x - LowLimit.x) / LimitLen);
-		}
-		else {
-			aegSetEnabled(X_AXIS_BAR, false);
-			aegSetPosition(X_AXIS_BAR, 0);
-		}
+	LimitLen = HighLimit.x - LowLimit.x;
+	if (!isnan(Angles.x) && LimitLen > 0) {
+
+		aegSetEnabled(X_ANGLE_INPUT, true);
+		aegSetText(X_ANGLE_INPUT, f2ws(degrees(Angles.x), 2).c_str());		
+		aegSetEnabled(X_AXIS_BAR, true);
+		aegSetPosition(X_AXIS_BAR, (Angles.x - LowLimit.x) / LimitLen);
 	}
 	else {
 		aegSetEnabled(X_ANGLE_INPUT, false);
@@ -415,19 +415,13 @@ void Form::UpdatePositionAndAngles(void)
 		aegSetPosition(X_AXIS_BAR, 0);
 	}
 	
-	if (!isnan(Angles.y)) {
+	LimitLen = HighLimit.y - LowLimit.y;
+	if (!isnan(Angles.y) && LimitLen > 0) {
+	
 		aegSetEnabled(Y_ANGLE_INPUT, true);
 		aegSetText(Y_ANGLE_INPUT, f2ws(degrees(Angles.y), 2).c_str());
-
-		float LimitLen = HighLimit.y - LowLimit.y;
-		if (LimitLen > 0) {
-			aegSetEnabled(Y_AXIS_BAR, true);
-			aegSetPosition(Y_AXIS_BAR, (Angles.y - LowLimit.y) / LimitLen);
-		}
-		else {
-			aegSetEnabled(Y_AXIS_BAR, false);
-			aegSetPosition(Y_AXIS_BAR, 0);
-		}
+		aegSetEnabled(Y_AXIS_BAR, true);
+		aegSetPosition(Y_AXIS_BAR, (Angles.y - LowLimit.y) / LimitLen);
 	}
 	else {
 		aegSetEnabled(Y_ANGLE_INPUT, false);
@@ -436,19 +430,13 @@ void Form::UpdatePositionAndAngles(void)
 		aegSetPosition(Y_AXIS_BAR, 0);
 	}
 
-	if (!isnan(Angles.z)) {
+	LimitLen = HighLimit.z - LowLimit.z;
+	if (!isnan(Angles.z) && LimitLen > 0) {
+		
 		aegSetEnabled(Z_ANGLE_INPUT, true);
 		aegSetText(Z_ANGLE_INPUT, f2ws(degrees(Angles.z), 2).c_str());
-
-		float LimitLen = HighLimit.z - LowLimit.z;
-		if (LimitLen > 0) {
-			aegSetEnabled(Z_AXIS_BAR, true);
-			aegSetPosition(Z_AXIS_BAR, (Angles.z - LowLimit.z) / LimitLen);
-		}
-		else {
-			aegSetEnabled(Z_AXIS_BAR, false);
-			aegSetPosition(Z_AXIS_BAR, 0);
-		}
+		aegSetEnabled(Z_AXIS_BAR, true);
+		aegSetPosition(Z_AXIS_BAR, (Angles.z - LowLimit.z) / LimitLen);
 	}
 	else {
 		aegSetEnabled(Z_ANGLE_INPUT, false);

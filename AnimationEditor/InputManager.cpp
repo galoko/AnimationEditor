@@ -160,8 +160,13 @@ void InputManager::ProcessCameraMovement(double dt)
 	if (IsPressed('A'))
 		Offset -= SideDirection;
 
-	if (length(Offset) > 0)
+	if (length(Offset) > 0) {
+
 		Render::GetInstance().MoveCamera(normalize(Offset) * Speed * (float)dt);
+
+		if (State == InverseKinematic && Selection.HaveBone())
+			SetWorldPointToScreePoint(MouseX, MouseY);
+	}
 }
 
 vec3 InputManager::GetPlaneNormal(void)
@@ -188,6 +193,18 @@ vec3 InputManager::GetPlaneNormal(void)
 	float Direction = dot(CameraNormal, Result) > 0 ? 1.0f : -1.0f;
 
 	return Result * Direction;
+}
+
+void InputManager::RecalcSelectedWorldPoint(void)
+{
+	if (Selection.HaveBone()) {
+
+		Bone* Bone = Selection.Bone;
+
+		vec3 WorldPoint = Bone->WorldTransform * Bone->MiddleTranslation * vec4(Selection.LocalPoint, 1);
+
+		Selection.SetWorldPoint(WorldPoint);
+	}
 }
 
 void InputManager::SetWorldPointToScreePoint(LONG x, LONG y) {
