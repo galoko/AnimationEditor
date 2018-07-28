@@ -37,7 +37,7 @@ private:
 
 	BYTE LastKeyboardState[256], CurrentKeyboardState[256];
 	LONG MouseX, MouseY;
-	bool IsInFocus, IsMouseLockEnforced, IsCameraMode;
+	bool IsInFocus, IsMouseLockEnforced, IsCameraMode, WasMoving;
 
 	InputState State;
 

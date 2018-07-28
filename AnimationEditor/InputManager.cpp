@@ -162,11 +162,15 @@ void InputManager::ProcessCameraMovement(double dt)
 
 	if (length(Offset) > 0) {
 
+		WasMoving = true;
+
 		Render::GetInstance().MoveCamera(normalize(Offset) * Speed * (float)dt);
 
 		if (State == InverseKinematic && Selection.HaveBone())
-			SetWorldPointToScreePoint(MouseX, MouseY);
+			SetCursorToWorldPoint(Selection.GetWorldPoint());
 	}
+	else 
+		WasMoving = false;
 }
 
 vec3 InputManager::GetPlaneNormal(void)
@@ -232,7 +236,15 @@ void InputManager::SetCursorToWorldPoint(vec3 WorldPoint)
 	POINT ScreenPoint = { x, y };
 	ClientToScreen(WindowHandle, &ScreenPoint);
 
+	if (IsMouseLockEnforced)
+		ClipCursor(NULL);
+
 	SetCursorPos(ScreenPoint.x, ScreenPoint.y);
+
+	if (IsMouseLockEnforced) {
+		RECT Rect = { ScreenPoint.x, ScreenPoint.y, ScreenPoint.x + 1, ScreenPoint.y + 1 };
+		ClipCursor(&Rect);
+	}
 }
 
 void InputManager::ProcessKeyboardInput(double dt) {
@@ -335,7 +347,7 @@ void InputManager::ProcessMouseFormEvent(LONG x, LONG y) {
 	if (State == None && IsPressed(VK_LBUTTON))
 		SelectBoneAtScreenPoint(MouseX, MouseY);
 	
-	if (State == InverseKinematic && Selection.HaveBone())
+	if (!WasMoving && !IsCameraMode && State == InverseKinematic && Selection.HaveBone())
 		SetWorldPointToScreePoint(MouseX, MouseY);
 }
 
