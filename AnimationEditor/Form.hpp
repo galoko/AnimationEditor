@@ -25,7 +25,7 @@ private:
 
 	int32 UpdateBlockCounter;
 	bool IsBlockingUpdatePending, IsPositionsAndAnglesUpdatePending;
-	
+
 	void ProcessPendingUpdates(void);
 
 	static LRESULT CALLBACK WndProcStaticCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -65,4 +65,5 @@ public:
 
 	void UpdateBlocking(void);
 	void UpdatePositionAndAngles(void);
+	void FullUpdate(void);
 } Form;

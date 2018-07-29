@@ -61,6 +61,8 @@ void InputManager::ProcessMouseLockState(void)
 		POINT CursorPoint;
 		if (!IsMouseLockEnforced && GetCursorPos(&CursorPoint)) {
 
+			SkipMouseFormEventCount++;
+
 			RECT Rect = { CursorPoint.x, CursorPoint.y, CursorPoint.x + 1, CursorPoint.y + 1 };
 			ClipCursor(&Rect);
 
@@ -70,6 +72,8 @@ void InputManager::ProcessMouseLockState(void)
 		}
 	}
 	else if (IsMouseLockEnforced) {
+
+		SkipMouseFormEventCount++;
 
 		ShowCursor(true);
 		ClipCursor(NULL);
@@ -199,13 +203,19 @@ vec3 InputManager::GetPlaneNormal(void)
 	return Result * Direction;
 }
 
-void InputManager::RecalcSelectedWorldPoint(void)
+void InputManager::ChangeBoneAngles(Bone* Bone, vec3 Angles)
 {
+	mat4 PreviousM = Bone->WorldTransform * Bone->MiddleTranslation;
+
+	PhysicsManager::GetInstance().SetBoneAngles(Bone, Angles);
+
+	mat4 CurrentM = Bone->WorldTransform * Bone->MiddleTranslation;
+
 	if (Selection.HaveBone()) {
 
-		Bone* Bone = Selection.Bone;
+		vec3 WorldPoint = Selection.GetWorldPoint();
 
-		vec3 WorldPoint = Bone->WorldTransform * Bone->MiddleTranslation * vec4(Selection.LocalPoint, 1);
+		WorldPoint = CurrentM * inverse(PreviousM) * vec4(WorldPoint, 1);
 
 		Selection.SetWorldPoint(WorldPoint);
 	}
@@ -236,6 +246,8 @@ void InputManager::SetCursorToWorldPoint(vec3 WorldPoint)
 	POINT ScreenPoint = { x, y };
 	ClientToScreen(WindowHandle, &ScreenPoint);
 
+	SkipMouseFormEventCount++;
+
 	if (IsMouseLockEnforced)
 		ClipCursor(NULL);
 
@@ -261,8 +273,11 @@ void InputManager::ProcessKeyboardInput(double dt) {
 		ProcessMouseLockState();
 	}
 
-	if (WasPressed(VK_LBUTTON) && IsInteractionMode()) 
+	if (WasPressed(VK_LBUTTON) && IsInteractionMode()) {
+
+		SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput VK_LBUTTON");
 		SelectBoneAtScreenPoint(MouseX, MouseY);
+	}
 
 	if (WasPressed(VK_ESCAPE)) {
 
@@ -273,6 +288,9 @@ void InputManager::ProcessKeyboardInput(double dt) {
 	}
 
 	if (WasPressed('Q')) {
+
+		SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput Q");
+
 		if (State == None) {
 			SetCursorToWorldPoint(Selection.GetWorldPoint());
 			SetState(InverseKinematic);
@@ -284,8 +302,12 @@ void InputManager::ProcessKeyboardInput(double dt) {
 
 	if (WasPressed('R') && Selection.HaveBone()) {
 
-		if (IsPressed(VK_LCONTROL))
+		SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput R");
+
+		if (IsPressed(VK_LCONTROL)) {
+
 			AnimationManager::GetInstance().BlockEverythingExceptThisBranch(Selection.Bone->Parent, Selection.Bone);
+		}
 		else {
 
 			BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
@@ -298,8 +320,26 @@ void InputManager::ProcessKeyboardInput(double dt) {
 		}
 	}
 
+	if (IsPressed(VK_LCONTROL)) {
+
+		MouseUnlockTime = GetTickCount64() + StateSwapMouseTimeout;
+
+		if (WasPressed('Z'))
+			SerializationManager::GetInstance().PopAndDeserializeStateFrame(false);
+		else
+		if (WasPressed('X'))
+			SerializationManager::GetInstance().PopAndDeserializeStateFrame(true);
+	}
+
+	/*
 	if (WasPressed(VK_F5)) {
 		CompleteSerializedState SavedState;
+
+		SavedState.HaveCharState = true;
+		SavedState.HaveInputState = true;
+		SavedState.HaveAnimationState = true;
+		SavedState.HaveRenderState = true;
+
 		SerializationManager::GetInstance().Serialize(SavedState);
 		SerializationManager::GetInstance().SaveToFile(SavedState, L"H:\\test.xml");
 	}
@@ -309,11 +349,33 @@ void InputManager::ProcessKeyboardInput(double dt) {
 		SerializationManager::GetInstance().LoadFromFile(SavedState, L"H:\\test.xml");
 		SerializationManager::GetInstance().Deserialize(SavedState);
 	}
+	*/
 
-	if (WasPressed('P'))
+	if (WasPressed('U')) {
+
+		InputSelection Selection = InputManager::GetInstance().GetSelection();
+
+		if (Selection.HaveBone()) {
+
+			SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput U");
+
+			if (!AnimationManager::GetInstance().IsBonePositionConstrained(Selection.Bone))
+				AnimationManager::GetInstance().ConstrainBonePosition(Selection.Bone, Selection.GetWorldPoint());
+			else
+				AnimationManager::GetInstance().RemoveBonePositionConstraint(Selection.Bone);
+		}
+	}
+
+	if (WasPressed('P')) {
+
+		SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput P");
+
 		AnimationManager::GetInstance().UnblockAllBones();
+	}
 
 	if (WasPressed('K') && Selection.HaveBone()) {
+
+		SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput K");
 
 		BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
 		
@@ -324,14 +386,29 @@ void InputManager::ProcessKeyboardInput(double dt) {
 		AnimationManager::GetInstance().SetBoneBlocking(Selection.Bone, Blocking);
 	}
 
-	if (WasPressed('Z'))
-		PlaneMode = PlaneZ;
-	if (WasPressed('X'))
-		PlaneMode = PlaneX;
-	if (WasPressed('C'))
-		PlaneMode = PlaneY;
-	if (WasPressed('V'))
-		PlaneMode = PlaneCamera;
+	if (!IsPressed(VK_CONTROL) && (WasPressed('Z') || WasPressed('X') || WasPressed('C') || WasPressed('V'))) {
+
+		enum PlaneMode NextPlaneMode;
+
+		if (WasPressed('Z'))
+			NextPlaneMode = PlaneZ;
+		else
+		if (WasPressed('X'))
+			NextPlaneMode = PlaneX;
+		else
+		if (WasPressed('C'))
+			NextPlaneMode = PlaneY;
+		else
+		if (WasPressed('V'))
+			NextPlaneMode = PlaneCamera;
+
+		if (PlaneMode != NextPlaneMode) {
+
+			SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput Z|X|C|V");
+
+			PlaneMode = NextPlaneMode;
+		}
+	}
 
 	ProcessCameraMovement(dt);
 
@@ -341,14 +418,30 @@ void InputManager::ProcessKeyboardInput(double dt) {
 
 void InputManager::ProcessMouseFormEvent(LONG x, LONG y) {
 
+	if (MouseX == x && MouseY == y)
+		return;
+
 	MouseX = x;
 	MouseY = y;
 
+	if (SkipMouseFormEventCount > 0) {
+		SkipMouseFormEventCount--;
+		return;
+	}
+
+	ULONGLONG Now = GetTickCount64();
+	if (MouseUnlockTime > Now)
+		return;
+
 	if (State == None && IsPressed(VK_LBUTTON))
 		SelectBoneAtScreenPoint(MouseX, MouseY);
-	
-	if (!WasMoving && !IsCameraMode && State == InverseKinematic && Selection.HaveBone())
+
+	if (!WasMoving && !IsCameraMode && State == InverseKinematic && Selection.HaveBone()) {
+
+		SerializationManager::GetInstance().PushPendingStateFrame(PendingInverseKinematic, L"ProcessMouseFormEvent");
+
 		SetWorldPointToScreePoint(MouseX, MouseY);
+	}
 }
 
 void InputManager::ProcessKeyboardEvent(void) {
@@ -360,6 +453,8 @@ void InputManager::ProcessKeyboardEvent(void) {
 void InputManager::ProcessMouseWheelEvent(float Delta) {
 
 	if (State == InverseKinematic && Selection.HaveBone()) {
+
+		SerializationManager::GetInstance().PushPendingStateFrame(PendingInverseKinematic, L"ProcessMouseWheelEvent");
 
 		vec3 PlaneNormal = GetPlaneNormal();
 

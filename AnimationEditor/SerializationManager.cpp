@@ -12,17 +12,17 @@
 
 void SerializationManager::Serialize(CompleteSerializedState& State)
 {
-	CharacterManager::GetInstance().Serialize(State.CharState);
-	State.HaveCharState = true;
+	if (State.HaveCharState)
+		CharacterManager::GetInstance().Serialize(State.CharState);
 
-	InputManager::GetInstance().Serialize(State.InputState);
-	State.HaveInputState = true;
+	if (State.HaveInputState)
+		InputManager::GetInstance().Serialize(State.InputState);
 
-	AnimationManager::GetInstance().Serialize(State.AnimationState);
-	State.HaveAnimationState = true;
+	if (State.HaveAnimationState)
+		AnimationManager::GetInstance().Serialize(State.AnimationState);
 
-	Render::GetInstance().Serialize(State.RenderState);
-	State.HaveRenderState = true;
+	if (State.HaveRenderState)
+		Render::GetInstance().Serialize(State.RenderState);
 }
 
 void SerializationManager::Deserialize(CompleteSerializedState& State)
@@ -95,20 +95,91 @@ void SerializationManager::SaveToFile(CompleteSerializedState& State, const wstr
 	fclose(File);
 }
 
+void SerializationManager::Tick(double dt)
+{
+	/*
+	ULONGLONG Now = GetTickCount64();
+	if (CurrentPendingID != PendingNone && PendingLastTime + PendingTimeout <= Now)
+		PushStateFrame();
+	*/
+}
+
+void SerializationManager::InternalPushStateFrame(bool Forward)
+{
+	StateFrame Frame;
+
+	Frame.PendingID = CurrentPendingID;
+
+	Frame.State.HaveCharState = true;
+	Frame.State.HaveInputState = true;
+	Frame.State.HaveAnimationState = true;
+	Frame.State.HaveRenderState = false;
+
+	Serialize(Frame.State);
+
+	if (Forward)
+		ForwardStateFrames.push(Frame);
+	else
+		StateFrames.push(Frame);
+
+	CurrentPendingID = PendingNone;
+	PendingLastTime = 0;
+}
+
+void SerializationManager::PushStateFrame(const wstring Sender)
+{
+	printf("PUSH STATE, SENDER: %ws\n", Sender.c_str());
+
+	ForwardStateFrames = {};
+
+	InternalPushStateFrame(false);
+}
+
+void SerializationManager::PushPendingStateFrame(SerializationPendingID PendingID, const wstring Sender)
+{
+	assert(PendingID != PendingNone);
+
+	ULONGLONG Now = GetTickCount64();
+
+	if (CurrentPendingID != PendingID || PendingLastTime + PendingTimeout <= Now)
+		PushStateFrame(L"Pending (" + Sender + L")");
+
+	CurrentPendingID = PendingID;
+	PendingLastTime = Now;
+}
+
+void SerializationManager::PopAndDeserializeStateFrame(bool Forward)
+{
+	stack<StateFrame>* StackToUse = Forward ? &ForwardStateFrames : &StateFrames;
+
+	if (!StackToUse->empty()) {
+
+		InternalPushStateFrame(!Forward);
+
+		StateFrame Frame = StackToUse->top();
+		StackToUse->pop();
+
+		Deserialize(Frame.State);
+
+		CurrentPendingID = Frame.PendingID;
+		PendingLastTime = GetTickCount64();
+	}
+}
+
 // Utils
 
-wstring s2ws(const std::string& str)
+wstring s2ws(const string& str)
 {
-	using convert_typeX = std::codecvt_utf8<wchar_t>;
-	std::wstring_convert<convert_typeX, wchar_t> converterX;
+	using convert_typeX = codecvt_utf8<wchar_t>;
+	wstring_convert<convert_typeX, wchar_t> converterX;
 
 	return converterX.from_bytes(str);
 }
 
-string ws2s(const std::wstring& wstr)
+string ws2s(const wstring& wstr)
 {
-	using convert_typeX = std::codecvt_utf8<wchar_t>;
-	std::wstring_convert<convert_typeX, wchar_t> converterX;
+	using convert_typeX = codecvt_utf8<wchar_t>;
+	wstring_convert<convert_typeX, wchar_t> converterX;
 
 	return converterX.to_bytes(wstr);
 }

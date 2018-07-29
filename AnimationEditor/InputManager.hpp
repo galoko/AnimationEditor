@@ -33,11 +33,15 @@ typedef class InputManager {
 private:
 	InputManager(void) { };
 
+	const int StateSwapMouseTimeout = 50;
+
 	HWND WindowHandle;
 
 	BYTE LastKeyboardState[256], CurrentKeyboardState[256];
 	LONG MouseX, MouseY;
 	bool IsInFocus, IsMouseLockEnforced, IsCameraMode, WasMoving;
+	int SkipMouseFormEventCount;
+	ULONGLONG MouseUnlockTime;
 
 	InputState State;
 
@@ -90,7 +94,7 @@ public:
 	InputState GetState(void);
 	InputSelection GetSelection(void);
 	vec3 GetPlaneNormal(void);
-	void RecalcSelectedWorldPoint(void);
+	void ChangeBoneAngles(Bone* Bone, vec3 Angles);
 
 	void ProcessMouseInput(LONG dx, LONG dy);	
 	void ProcessMouseFormEvent(LONG x, LONG y);

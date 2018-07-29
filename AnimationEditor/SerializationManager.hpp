@@ -2,6 +2,10 @@
 
 #include <string>
 #include <vector>
+#include <stack>
+
+#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+#include <windows.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -73,9 +77,27 @@ typedef struct CompleteSerializedState {
 	bool HaveCharState, HaveInputState, HaveAnimationState, HaveRenderState;
 } CompleteSerializedState;
 
+	typedef enum SerializationPendingID {
+		PendingNone,
+		PendingAnglesTrackBar,
+		PendingInverseKinematic
+	} SerializationPendingID;
+
 typedef class SerializationManager {
 private:
+
+	typedef struct StateFrame {
+		SerializationPendingID PendingID;
+		CompleteSerializedState State;
+	} StateFrame;
+
+	SerializationPendingID CurrentPendingID;
+	ULONGLONG PendingLastTime;
+	stack<StateFrame> StateFrames, ForwardStateFrames;
+
 	SerializationManager(void) { };
+
+	void InternalPushStateFrame(bool Forward);
 public:
 	static SerializationManager& GetInstance(void) {
 		static SerializationManager Instance;
@@ -91,4 +113,13 @@ public:
 
 	void LoadFromFile(CompleteSerializedState& State, const wstring FileName);
 	void SaveToFile(CompleteSerializedState& State, const wstring FileName);
+
+	void Tick(double dt);
+
+	const int PendingTimeout = 250;
+
+	void PushStateFrame(const wstring Sender);
+	void PushPendingStateFrame(SerializationPendingID PendingID, const wstring Sender);
+	void PopAndDeserializeStateFrame(bool Forward);
+
 } SerializationManager;

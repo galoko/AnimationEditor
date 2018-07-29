@@ -164,6 +164,8 @@ void AnimationManager::Deserialize(AnimationSerializedState& State)
 		PhysicsManager::GetInstance().SetPinpoint(Bone->AnimCtx->Pinpoint, SerializedContext.IsActive ? Bone->PhysicBody : nullptr, 
 			SerializedContext.SrcLocalPoint, SerializedContext.DestWorldPoint);
 	}
+
+	Form::GetInstance().FullUpdate();
 }
 
 void AnimationManager::PhysicsPreSolve(void) {

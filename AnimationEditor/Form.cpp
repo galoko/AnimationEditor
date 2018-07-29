@@ -63,6 +63,8 @@ void Form::Tick(double dt) {
 
 	AnimationManager::GetInstance().Tick(dt);
 
+	SerializationManager::GetInstance().Tick(dt);
+
 	// redraw
 	RedrawWindow(WindowHandle, NULL, 0, RDW_INVALIDATE | RDW_UPDATENOW);
 }
@@ -181,7 +183,13 @@ void Form::CheckBoxStaticCallback(const wchar_t* Name, bool IsChecked)
 
 void Form::CheckBoxCallback(const wstring Name, bool IsChecked)
 {
-	Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
+	InputSelection Selection = InputManager::GetInstance().GetSelection();
+	if (!Selection.HaveBone())
+		return;
+
+	SerializationManager::GetInstance().PushStateFrame(L"CheckBoxCallback");
+
+	Bone* Bone = Selection.Bone;
 	BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Bone);
 
 	if (Name == X_POS)
@@ -223,6 +231,8 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 		if (Bone == nullptr)
 			return;
 
+		SerializationManager::GetInstance().PushStateFrame(L"EditCallback");
+
 		vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Bone);
 
 		if (Name == X_ANGLE_INPUT)
@@ -234,9 +244,7 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 		if (Name == Z_ANGLE_INPUT)
 			Angles.z = Angle;
 
-		PhysicsManager::GetInstance().SetBoneAngles(Bone, Angles);
-
-		InputManager::GetInstance().RecalcSelectedWorldPoint();
+		InputManager::GetInstance().ChangeBoneAngles(Bone, Angles);
 	}
 }
 
@@ -253,6 +261,8 @@ void Form::TrackBarCallback(const wstring Name, float t)
 		if (Bone == nullptr)
 			return;
 
+		SerializationManager::GetInstance().PushPendingStateFrame(PendingAnglesTrackBar, L"TrackBarCallback");
+
 		vec3 LowLimit = Bone->LowLimit;
 		vec3 HighLimit = Bone->HighLimit;
 
@@ -267,9 +277,7 @@ void Form::TrackBarCallback(const wstring Name, float t)
 		if (Name == Z_AXIS_BAR)
 			Angles.z = LowLimit.z + (HighLimit.z - LowLimit.z) * t;
 
-		PhysicsManager::GetInstance().SetBoneAngles(Bone, Angles);
-
-		InputManager::GetInstance().RecalcSelectedWorldPoint();
+		InputManager::GetInstance().ChangeBoneAngles(Bone, Angles);
 	}
 }
 
@@ -444,6 +452,12 @@ void Form::UpdatePositionAndAngles(void)
 		aegSetEnabled(Z_AXIS_BAR, false);
 		aegSetPosition(Z_AXIS_BAR, 0);
 	}
+}
+
+void Form::FullUpdate(void)
+{
+	UpdateBlocking();
+	UpdatePositionAndAngles();
 }
 
 void Form::ProcessPendingUpdates(void)

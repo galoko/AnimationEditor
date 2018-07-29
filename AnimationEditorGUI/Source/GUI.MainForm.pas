@@ -264,8 +264,10 @@ begin
   if Component is TTrackBar then
   begin
     TrackBar:= TTrackBar(Component);
+    (*
     if TrackBar.Focused then
       Exit;
+    *)
 
     Position:= TrackBar.Min + Round((TrackBar.Max - TrackBar.Min) * t);
 
