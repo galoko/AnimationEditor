@@ -13,7 +13,7 @@ type
     OpenGLPanel: TPanel;
     UpperControlPanel: TPanel;
     ApplicationEvents: TApplicationEvents;
-    ConstrainPosition: TButton;
+    ResetRootPosition: TButton;
     XPos: TCheckBox;
     YPos: TCheckBox;
     ZPos: TCheckBox;

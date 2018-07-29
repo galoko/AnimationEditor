@@ -30,7 +30,7 @@ void InputManager::Tick(double dt) {
 
 	ProcessKeyboardInput(dt);
 
-	if (State == InverseKinematic && Selection.HaveBone())
+	if (IsStateInverseKinematic(State) && Selection.HaveBone())
 		AnimationManager::GetInstance().InverseKinematic(Selection.Bone, Selection.LocalPoint, Selection.GetWorldPoint());
 }
 
@@ -42,6 +42,11 @@ void InputManager::SetFocus(bool IsInFocusNow) {
 
 		ProcessMouseLockState();
 	}
+}
+
+bool InputManager::IsStateInverseKinematic(InputState State)
+{
+	return State == InverseKinematic || State == InverseKinematicAutomate;
 }
 
 InputState InputManager::GetState(void)
@@ -96,7 +101,10 @@ void InputManager::ProcessMouseInput(LONG dx, LONG dy) {
 
 void InputManager::SetState(InputState NewState)
 {
-	if (State == InverseKinematic && NewState != InverseKinematic)
+	if (NewState == InverseKinematic && Selection.HaveBone())
+		SetCursorToWorldPoint(Selection.GetWorldPoint());
+
+	if (IsStateInverseKinematic(State) && !IsStateInverseKinematic(NewState))
 		AnimationManager::GetInstance().CancelInverseKinematic();
 
 	State = NewState;
@@ -132,6 +140,9 @@ void InputManager::SelectBoneAtScreenPoint(LONG x, LONG y) {
 
 		Form::GetInstance().UpdateBlocking();
 		Form::GetInstance().UpdatePositionAndAngles();
+
+		if (State == InverseKinematicAutomate)
+			SetState(InverseKinematic);
 	}
 }
 
@@ -139,7 +150,7 @@ void InputManager::CancelSelection(void) {
 
 	Selection.Bone = nullptr;
 
-	if (State == InverseKinematic)
+	if (IsStateInverseKinematic(State))
 		AnimationManager::GetInstance().CancelInverseKinematic();
 
 	Form::GetInstance().UpdateBlocking();
@@ -221,6 +232,15 @@ void InputManager::ChangeBoneAngles(Bone* Bone, vec3 Angles)
 	}
 }
 
+void InputManager::SetupInverseKinematic(Bone* Bone, vec3 LocalPoint, vec3 DestWorldPoint, bool IsAutomatic)
+{
+	Selection.Bone = Bone;
+	Selection.LocalPoint = LocalPoint;
+	Selection.SetWorldPoint(DestWorldPoint);
+
+	SetState(IsAutomatic ? InverseKinematicAutomate: InverseKinematic);
+}
+
 void InputManager::SetWorldPointToScreePoint(LONG x, LONG y) {
 
 	vec3 Point, Direction;
@@ -291,14 +311,21 @@ void InputManager::ProcessKeyboardInput(double dt) {
 
 		SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput Q");
 
-		if (State == None) {
-			SetCursorToWorldPoint(Selection.GetWorldPoint());
-			SetState(InverseKinematic);
+		if (State == None) 
+			SetupInverseKinematic(Selection.Bone, Selection.LocalPoint, Selection.GetWorldPoint(), false);
+		else {
+			if (State == InverseKinematicAutomate) 
+				SetState(InverseKinematic);
+			else
+			if (State == InverseKinematic)
+				SetState(None);
 		}
-		else
-		if (State == InverseKinematic) 
-			SetState(None);		
 	}
+
+	if (WasPressed(VK_F5))
+		SerializationManager::GetInstance().SaveToFile(L"H:\\test.xml");
+	if (WasPressed(VK_F9))
+		SerializationManager::GetInstance().LoadFromFile(L"H:\\test.xml");
 
 	if (WasPressed('R') && Selection.HaveBone()) {
 
@@ -331,26 +358,6 @@ void InputManager::ProcessKeyboardInput(double dt) {
 			SerializationManager::GetInstance().PopAndDeserializeStateFrame(true);
 	}
 
-	/*
-	if (WasPressed(VK_F5)) {
-		CompleteSerializedState SavedState;
-
-		SavedState.HaveCharState = true;
-		SavedState.HaveInputState = true;
-		SavedState.HaveAnimationState = true;
-		SavedState.HaveRenderState = true;
-
-		SerializationManager::GetInstance().Serialize(SavedState);
-		SerializationManager::GetInstance().SaveToFile(SavedState, L"H:\\test.xml");
-	}
-
-	if (WasPressed(VK_F9)) {
-		CompleteSerializedState SavedState;
-		SerializationManager::GetInstance().LoadFromFile(SavedState, L"H:\\test.xml");
-		SerializationManager::GetInstance().Deserialize(SavedState);
-	}
-	*/
-
 	if (WasPressed('U')) {
 
 		InputSelection Selection = InputManager::GetInstance().GetSelection();
@@ -379,9 +386,9 @@ void InputManager::ProcessKeyboardInput(double dt) {
 
 		BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
 		
-		Blocking.XAxis = false;
-		Blocking.YAxis = false;
-		Blocking.ZAxis = false;
+		Blocking.XAxis = !Blocking.XAxis;
+		Blocking.YAxis = !Blocking.YAxis;
+		Blocking.ZAxis = !Blocking.ZAxis;
 
 		AnimationManager::GetInstance().SetBoneBlocking(Selection.Bone, Blocking);
 	}
@@ -436,7 +443,7 @@ void InputManager::ProcessMouseFormEvent(LONG x, LONG y) {
 	if (State == None && IsPressed(VK_LBUTTON))
 		SelectBoneAtScreenPoint(MouseX, MouseY);
 
-	if (!WasMoving && !IsCameraMode && State == InverseKinematic && Selection.HaveBone()) {
+	if (State == InverseKinematic && !WasMoving && !IsCameraMode && Selection.HaveBone()) {
 
 		SerializationManager::GetInstance().PushPendingStateFrame(PendingInverseKinematic, L"ProcessMouseFormEvent");
 
@@ -488,9 +495,6 @@ void InputManager::Deserialize(InputSerializedState& State)
 		SetState((InputState)State.State);
 	else
 		SetState(None);
-
-	if (this->State != None && Selection.HaveBone())
-		SetCursorToWorldPoint(Selection.GetWorldPoint());
 }
 
 // General API

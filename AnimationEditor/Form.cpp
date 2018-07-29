@@ -8,6 +8,7 @@
 #include "Render.hpp"
 #include "InputManager.hpp"
 #include "AnimationManager.hpp"
+#include "CharacterManager.hpp"
 #include "ExternalGUI.hpp"
 #include "shader.hpp"
 
@@ -164,15 +165,13 @@ void Form::ButtonStaticCallback(const wchar_t * Name)
 
 void Form::ButtonCallback(const wstring Name)
 {
-	if (Name == CONSTRAIN_POSITION) {
+	if (Name == RESET_ROOT_POSITION) {
 
-		InputSelection Selection = InputManager::GetInstance().GetSelection();
+		Character* Char = CharacterManager::GetInstance().GetCharacter();
 
-		if (Selection.HaveBone())
-			if (!AnimationManager::GetInstance().IsBonePositionConstrained(Selection.Bone))
-				AnimationManager::GetInstance().ConstrainBonePosition(Selection.Bone, Selection.GetWorldPoint());
-			else
-				AnimationManager::GetInstance().RemoveBonePositionConstraint(Selection.Bone);
+		Char->Position = vec3(0.0f);
+		Char->UpdateWorldTranforms();
+		PhysicsManager::GetInstance().SyncWorldWithCharacter();
 	}
 }
 
@@ -231,7 +230,7 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 		if (Bone == nullptr)
 			return;
 
-		SerializationManager::GetInstance().PushStateFrame(L"EditCallback");
+		SerializationManager::GetInstance().PushStateFrame(L"EditCallback Angles");
 
 		vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Bone);
 
@@ -245,6 +244,32 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 			Angles.z = Angle;
 
 		InputManager::GetInstance().ChangeBoneAngles(Bone, Angles);
+	}
+
+	if (Name == X_POS_INPUT || Name == Y_POS_INPUT || Name == Z_POS_INPUT) {
+
+		float Position = Value / 100.0f; // to meters
+
+		Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
+		if (Bone == nullptr)
+			return;
+
+		SerializationManager::GetInstance().PushStateFrame(L"EditCallback Position");
+
+		vec3 LocalPoint = Bone->Tail * Bone->Size;
+
+		vec3 BonePosition = Bone->WorldTransform * vec4(LocalPoint, 1);
+
+		if (Name == X_POS_INPUT)
+			BonePosition.x = Position;
+		else
+		if (Name == Y_POS_INPUT)
+			BonePosition.y = Position;
+		else
+		if (Name == Z_POS_INPUT)
+			BonePosition.z = Position;
+
+		InputManager::GetInstance().SetupInverseKinematic(Bone, inverse(Bone->MiddleTranslation) * vec4(LocalPoint, 1), BonePosition, true);
 	}
 }
 
@@ -288,7 +313,6 @@ void Form::UpdateBlocking(void)
 	InputSelection Selection = InputManager::GetInstance().GetSelection();
 	if (!Selection.HaveBone()) {
 
-		aegSetEnabled(CONSTRAIN_POSITION, false);
 		aegSetEnabled(X_POS,  false);
 		aegSetEnabled(Y_POS,  false);
 		aegSetEnabled(Z_POS,  false);
@@ -305,8 +329,6 @@ void Form::UpdateBlocking(void)
 
 		return;
 	}
-
-	aegSetEnabled(CONSTRAIN_POSITION, true);
 
 	BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
 	vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Selection.Bone);
@@ -397,7 +419,8 @@ void Form::UpdatePositionAndAngles(void)
 	vec3 LowLimit = Selection.Bone->LowLimit;
 	vec3 HighLimit = Selection.Bone->HighLimit;
 
-	vec3 WorldPoint = (Selection.Bone->WorldTransform * Selection.Bone->MiddleTranslation) * vec4(0, 0, 0, 1); // to cm
+	vec3 LocalPoint = Selection.Bone->Tail * Selection.Bone->Size;
+	vec3 WorldPoint = Selection.Bone->WorldTransform * vec4(LocalPoint, 1);
 	WorldPoint *= 100.0f; // to cm
 
 	vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Selection.Bone);

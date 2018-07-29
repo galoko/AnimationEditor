@@ -12,6 +12,8 @@
 
 void SerializationManager::Serialize(CompleteSerializedState& State)
 {
+	State.PendingID = CurrentPendingID;
+
 	if (State.HaveCharState)
 		CharacterManager::GetInstance().Serialize(State.CharState);
 
@@ -27,6 +29,9 @@ void SerializationManager::Serialize(CompleteSerializedState& State)
 
 void SerializationManager::Deserialize(CompleteSerializedState& State)
 {
+	CurrentPendingID = State.PendingID;
+	PendingLastTime = GetTickCount64();
+
 	if (State.HaveRenderState)
 		Render::GetInstance().Deserialize(State.RenderState);
 
@@ -40,13 +45,8 @@ void SerializationManager::Deserialize(CompleteSerializedState& State)
 		AnimationManager::GetInstance().Deserialize(State.AnimationState);
 }
 
-void SerializationManager::LoadFromFile(CompleteSerializedState& State, const wstring FileName)
+void SerializationManager::LoadFromFile(const wstring FileName)
 {
-	State.HaveCharState = false;
-	State.HaveInputState = false;
-	State.HaveAnimationState = false;
-	State.HaveRenderState = false;
-
 	FILE* File = _wfopen(FileName.c_str(), L"rb");
 	if (File == nullptr)
 		return;
@@ -58,37 +58,60 @@ void SerializationManager::LoadFromFile(CompleteSerializedState& State, const ws
 	XMLNode* Root = Document.FirstChildElement("Root");
 	if (Root != nullptr) {
 
-		if (State.CharState.LoadFromXML(Document, Root))
-			State.HaveCharState = true;
+		OtherStates.clear();
 
-		if (State.InputState.LoadFromXML(Document, Root))
-			State.HaveInputState = true;
+		for (auto StatesElement : selection(Root->ToElement(), "States")) {
 
-		if (State.AnimationState.LoadFromXML(Document, Root))
-			State.HaveAnimationState = true;
+			CompleteSerializedStates States;
 
-		if (State.RenderState.LoadFromXML(Document, Root))
-			State.HaveRenderState = true;
+			LoadStates(States, Document, StatesElement);
+
+			OtherStates.push_back(States);
+		}
+
+		if (!OtherStates.empty()) {
+
+			CompleteSerializedStates ActiveStates = OtherStates.back();
+			OtherStates.pop_back();
+
+			Deserialize(ActiveStates.CurrentState);
+			StateFrames = ActiveStates.PreviousStates;
+			ForwardStateFrames = ActiveStates.FutureStates;
+		}
 	}
 
 	fclose(File);
 }
 
-void SerializationManager::SaveToFile(CompleteSerializedState& State, const wstring FileName)
+void SerializationManager::SaveToFile(const wstring FileName)
 {
 	XMLDocument Document;
 
 	XMLNode* Root = Document.NewElement("Root");
 	Document.InsertFirstChild(Root);
 
-	if (State.HaveCharState)
-		State.CharState.SaveToXML(Document, Root);
-	if (State.HaveInputState)
-		State.InputState.SaveToXML(Document, Root);
-	if (State.HaveAnimationState)
-		State.AnimationState.SaveToXML(Document, Root);
-	if (State.HaveRenderState)
-		State.RenderState.SaveToXML(Document, Root);
+	for (CompleteSerializedStates States : OtherStates) {
+
+		XMLElement* StatesElement = Document.NewElement("States");
+		Root->InsertEndChild(StatesElement);
+
+		SaveStates(States, Document, StatesElement);
+	}
+
+	CompleteSerializedStates ActiveStates;
+
+	ActiveStates.PreviousStates = StateFrames;
+	ActiveStates.FutureStates = ForwardStateFrames;
+
+	ActiveStates.CurrentState.HaveCharState = true;
+	ActiveStates.CurrentState.HaveInputState = true;
+	ActiveStates.CurrentState.HaveAnimationState = true;
+	ActiveStates.CurrentState.HaveRenderState = true;
+	Serialize(ActiveStates.CurrentState);
+
+	XMLElement* StatesElement = Document.NewElement("States");
+	Root->InsertEndChild(StatesElement);
+	SaveStates(ActiveStates, Document, StatesElement);
 
 	FILE* File = _wfopen(FileName.c_str(), L"wb");
 	Document.SaveFile(File, false);
@@ -97,30 +120,24 @@ void SerializationManager::SaveToFile(CompleteSerializedState& State, const wstr
 
 void SerializationManager::Tick(double dt)
 {
-	/*
-	ULONGLONG Now = GetTickCount64();
-	if (CurrentPendingID != PendingNone && PendingLastTime + PendingTimeout <= Now)
-		PushStateFrame();
-	*/
+
 }
 
 void SerializationManager::InternalPushStateFrame(bool Forward)
 {
-	StateFrame Frame;
+	CompleteSerializedState State;
 
-	Frame.PendingID = CurrentPendingID;
+	State.HaveCharState = true;
+	State.HaveInputState = true;
+	State.HaveAnimationState = true;
+	State.HaveRenderState = false;
 
-	Frame.State.HaveCharState = true;
-	Frame.State.HaveInputState = true;
-	Frame.State.HaveAnimationState = true;
-	Frame.State.HaveRenderState = false;
-
-	Serialize(Frame.State);
+	Serialize(State);
 
 	if (Forward)
-		ForwardStateFrames.push(Frame);
+		ForwardStateFrames.push_back(State);
 	else
-		StateFrames.push(Frame);
+		StateFrames.push_back(State);
 
 	CurrentPendingID = PendingNone;
 	PendingLastTime = 0;
@@ -130,7 +147,7 @@ void SerializationManager::PushStateFrame(const wstring Sender)
 {
 	printf("PUSH STATE, SENDER: %ws\n", Sender.c_str());
 
-	ForwardStateFrames = {};
+	ForwardStateFrames.clear();
 
 	InternalPushStateFrame(false);
 }
@@ -150,19 +167,16 @@ void SerializationManager::PushPendingStateFrame(SerializationPendingID PendingI
 
 void SerializationManager::PopAndDeserializeStateFrame(bool Forward)
 {
-	stack<StateFrame>* StackToUse = Forward ? &ForwardStateFrames : &StateFrames;
+	vector<CompleteSerializedState>* StackToUse = Forward ? &ForwardStateFrames : &StateFrames;
 
 	if (!StackToUse->empty()) {
 
 		InternalPushStateFrame(!Forward);
 
-		StateFrame Frame = StackToUse->top();
-		StackToUse->pop();
+		CompleteSerializedState State = StackToUse->back();
+		StackToUse->pop_back();
 
-		Deserialize(Frame.State);
-
-		CurrentPendingID = Frame.PendingID;
-		PendingLastTime = GetTickCount64();
+		Deserialize(State);
 	}
 }
 
@@ -217,11 +231,108 @@ uint32 attribute_uint32_value(XMLElement* Element, const char* AttributeName) {
 	return Result;
 }
 
+void SerializationManager::LoadState(CompleteSerializedState& State, XMLDocument& Document, XMLNode* Root)
+{
+	State.HaveCharState = false;
+	State.HaveInputState = false;
+	State.HaveAnimationState = false;
+	State.HaveRenderState = false;
+
+	XMLElement* Pending = Root->FirstChildElement("Pending");
+	if (Pending != nullptr)
+		State.PendingID = (SerializationPendingID)attribute_uint32_value(Pending, "ID");
+
+	if (State.CharState.LoadFromXML(Document, Root))
+		State.HaveCharState = true;
+
+	if (State.InputState.LoadFromXML(Document, Root))
+		State.HaveInputState = true;
+
+	if (State.AnimationState.LoadFromXML(Document, Root))
+		State.HaveAnimationState = true;
+
+	if (State.RenderState.LoadFromXML(Document, Root))
+		State.HaveRenderState = true;
+}
+
+void SerializationManager::SaveState(CompleteSerializedState& State, XMLDocument& Document, XMLNode* Root)
+{
+	XMLElement* PendingState = Document.NewElement("Pending");
+	PendingState->SetAttribute("ID", (uint32)State.PendingID);
+	Root->InsertEndChild(PendingState);
+
+	if (State.HaveCharState)
+		State.CharState.SaveToXML(Document, Root);
+	if (State.HaveInputState)
+		State.InputState.SaveToXML(Document, Root);
+	if (State.HaveAnimationState)
+		State.AnimationState.SaveToXML(Document, Root);
+	if (State.HaveRenderState)
+		State.RenderState.SaveToXML(Document, Root);
+}
+
+void SerializationManager::LoadStates(CompleteSerializedStates& States, XMLDocument& Document, XMLNode* Root)
+{
+	XMLElement* CurrentStateElement = Root->FirstChildElement("CurrentState");
+	if (CurrentStateElement != nullptr) {
+
+		LoadState(States.CurrentState, Document, CurrentStateElement);
+
+		States.PreviousStates.clear();
+		for (auto PreviousStateElement : selection(Root->ToElement(), "PreviousState")) {
+
+			CompleteSerializedState PreviousState;
+
+			LoadState(PreviousState, Document, PreviousStateElement);
+
+			States.PreviousStates.push_back(PreviousState);
+		}
+
+		States.FutureStates.clear();
+		for (auto FutureStateElement : selection(Root->ToElement(), "FutureState")) {
+
+			CompleteSerializedState FutureState;
+
+			LoadState(FutureState, Document, FutureStateElement);
+
+			States.FutureStates.push_back(FutureState);
+		}
+	}
+}
+
+void SerializationManager::SaveStates(CompleteSerializedStates& States, XMLDocument& Document, XMLNode* Root)
+{
+	for (CompleteSerializedState State : States.PreviousStates) {
+
+		XMLNode* PreviousState = Document.NewElement("PreviousState");
+		Root->InsertEndChild(PreviousState);
+
+		SaveState(State, Document, PreviousState);
+	}
+
+	XMLNode* CurrentState = Document.NewElement("CurrentState");
+	Root->InsertEndChild(CurrentState);
+
+	SaveState(States.CurrentState, Document, CurrentState);
+
+	for (CompleteSerializedState State : States.FutureStates) {
+
+		XMLNode* FutureState = Document.NewElement("FutureState");
+		Root->InsertEndChild(FutureState);
+
+		SaveState(State, Document, FutureState);
+	}
+}
+
 // CharacterSerializedState
 
 void CharacterSerializedState::SaveToXML(XMLDocument& Document, XMLNode *Root)
 {
 	XMLNode* CharState = Document.NewElement("CharState");
+
+	XMLElement* Animation = Document.NewElement("Animation");
+	Animation->SetAttribute("Timestamp", this->AnimationTimestamp);
+	CharState->InsertEndChild(Animation);
 
 	XMLElement* Position = Document.NewElement("Position");
 	Position->SetAttribute("X", this->Position.x);
@@ -254,13 +365,16 @@ bool CharacterSerializedState::LoadFromXML(XMLDocument& Document, XMLNode* Root)
 	if (CharState == nullptr)
 		return false;
 
-	XMLElement* Position = CharState->FirstChildElement("Position");
-	if (Position == nullptr)
-		return false;
+	XMLElement* Animation = CharState->FirstChildElement("Animation");
+	if (Animation != nullptr)
+		this->AnimationTimestamp = attribute_uint32_value(Animation, "Timestamp");
 
-	this->Position.x = attribute_float_value(Position, "X");
-	this->Position.y = attribute_float_value(Position, "Y");
-	this->Position.z = attribute_float_value(Position, "Z");
+	XMLElement* Position = CharState->FirstChildElement("Position");
+	if (Position != nullptr) {
+		this->Position.x = attribute_float_value(Position, "X");
+		this->Position.y = attribute_float_value(Position, "Y");
+		this->Position.z = attribute_float_value(Position, "Z");
+	}
 
 	for (auto BoneElement : selection(CharState->ToElement(), "Bone")) {
 
@@ -373,8 +487,8 @@ void AnimationSerializedState::SaveToXML(XMLDocument& Document, XMLNode* Root)
 		Blocking->SetAttribute("ZAxis", Context.Blocking.ZAxis);
 		ContextElement->InsertEndChild(Blocking);
 
-		XMLElement* IsActive = Document.NewElement("IsActive");
-		IsActive->SetAttribute("Value", Context.IsActive);
+		XMLElement* IsActive = Document.NewElement("Pinpoint");
+		IsActive->SetAttribute("IsActive", Context.IsActive);
 		ContextElement->InsertEndChild(IsActive);
 
 		XMLElement* SrcLocalPoint = Document.NewElement("SrcLocalPoint");
@@ -417,9 +531,9 @@ bool AnimationSerializedState::LoadFromXML(XMLDocument& Document, XMLNode* Root)
 			SerializedContext.Blocking.ZAxis = attribute_bool_value(Blocking, "ZAxis");
 		}
 
-		XMLElement* IsActive = BoneElement->FirstChildElement("IsActive");
-		if (IsActive != nullptr)
-			SerializedContext.IsActive = attribute_bool_value(IsActive, "Value");
+		XMLElement* Pinpoint = BoneElement->FirstChildElement("Pinpoint");
+		if (Pinpoint != nullptr)
+			SerializedContext.IsActive = attribute_bool_value(Pinpoint, "IsActive");
 
 		XMLElement* SrcLocalPoint = BoneElement->FirstChildElement("SrcLocalPoint");
 		if (SrcLocalPoint != nullptr) {

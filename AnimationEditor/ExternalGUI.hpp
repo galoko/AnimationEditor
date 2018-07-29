@@ -5,22 +5,22 @@
 
 bool SetupExternalGUI(void);
 
-#define CONSTRAIN_POSITION L"ConstrainPosition"
-#define X_POS              L"XPos"
-#define Y_POS              L"YPos"
-#define Z_POS              L"ZPos"
-#define X_AXIS             L"XAxis"
-#define Y_AXIS             L"YAxis"
-#define Z_AXIS             L"ZAxis"
-#define X_POS_INPUT        L"XPosInput"
-#define Y_POS_INPUT        L"YPosInput"
-#define Z_POS_INPUT        L"ZPosInput"
-#define X_ANGLE_INPUT      L"XAngleInput"
-#define Y_ANGLE_INPUT      L"YAngleInput"
-#define Z_ANGLE_INPUT      L"ZAngleInput"
-#define X_AXIS_BAR         L"XAxisBar"
-#define Y_AXIS_BAR         L"YAxisBar"
-#define Z_AXIS_BAR         L"ZAxisBar"
+#define RESET_ROOT_POSITION L"ResetRootPosition"
+#define X_POS               L"XPos"
+#define Y_POS               L"YPos"
+#define Z_POS               L"ZPos"
+#define X_AXIS              L"XAxis"
+#define Y_AXIS              L"YAxis"
+#define Z_AXIS              L"ZAxis"
+#define X_POS_INPUT         L"XPosInput"
+#define Y_POS_INPUT         L"YPosInput"
+#define Z_POS_INPUT         L"ZPosInput"
+#define X_ANGLE_INPUT       L"XAngleInput"
+#define Y_ANGLE_INPUT       L"YAngleInput"
+#define Z_ANGLE_INPUT       L"ZAngleInput"
+#define X_AXIS_BAR          L"XAxisBar"
+#define Y_AXIS_BAR          L"YAxisBar"
+#define Z_AXIS_BAR          L"ZAxisBar"
 
 typedef void(__stdcall *ButtonCallback)(const wchar_t* Name);
 typedef void(__stdcall *CheckBoxCallback)(const wchar_t* Name, bool IsChecked);

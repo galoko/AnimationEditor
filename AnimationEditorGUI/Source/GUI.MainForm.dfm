@@ -28,12 +28,12 @@ object AnimationEditorForm: TAnimationEditorForm
     ParentBackground = False
     ParentCtl3D = False
     TabOrder = 0
-    object ConstrainPosition: TButton
+    object ResetRootPosition: TButton
       Left = 24
       Top = 16
       Width = 105
       Height = 25
-      Caption = 'Constrain Position'
+      Caption = 'Reset Root Position'
       TabOrder = 0
     end
     object XAxis: TCheckBox

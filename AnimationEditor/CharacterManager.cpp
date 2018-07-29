@@ -15,6 +15,8 @@ void CharacterManager::Serialize(CharacterSerializedState& State)
 {
 	Character* Char = GetCharacter();
 
+	State.AnimationTimestamp = AnimationTimestamp;
+
 	State.Position = Char->Position;
 
 	State.Bones.clear();
@@ -25,6 +27,8 @@ void CharacterManager::Serialize(CharacterSerializedState& State)
 
 void CharacterManager::Deserialize(CharacterSerializedState& State)
 {
+	AnimationTimestamp = State.AnimationTimestamp;
+
 	Character* Char = GetCharacter();
 
 	Char->Position = State.Position;

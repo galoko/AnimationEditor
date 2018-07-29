@@ -13,6 +13,7 @@ using namespace glm;
 typedef enum InputState {
 	None,
 	InverseKinematic,
+	InverseKinematicAutomate,
 	BoneRotation
 } InputState;
 
@@ -91,10 +92,12 @@ public:
 	void Tick(double dt);
 	void SetFocus(bool IsInFocusNow);
 
+	static bool IsStateInverseKinematic(InputState State);
 	InputState GetState(void);
 	InputSelection GetSelection(void);
 	vec3 GetPlaneNormal(void);
 	void ChangeBoneAngles(Bone* Bone, vec3 Angles);
+	void SetupInverseKinematic(Bone* Bone, vec3 LocalPoint, vec3 DestWorldPoint, bool IsAutomatic);
 
 	void ProcessMouseInput(LONG dx, LONG dy);	
 	void ProcessMouseFormEvent(LONG x, LONG y);

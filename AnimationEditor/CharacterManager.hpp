@@ -12,6 +12,8 @@ private:
 	CharacterManager(void) { };
 
 	Character* Char;
+
+	uint32 AnimationTimestamp;
 public:
 	static CharacterManager& GetInstance(void) {
 		static CharacterManager Instance;

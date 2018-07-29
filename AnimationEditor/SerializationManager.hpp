@@ -2,7 +2,6 @@
 
 #include <string>
 #include <vector>
-#include <stack>
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 #include <windows.h>
@@ -22,6 +21,9 @@ typedef struct SerializedBone {
 } SerializedBone;
 
 typedef struct CharacterSerializedState {
+
+	uint32 AnimationTimestamp;
+
 	vec3 Position;
 	vector<SerializedBone> Bones;
 
@@ -67,7 +69,14 @@ typedef struct RenderSerializedState {
 	bool LoadFromXML(XMLDocument& Document, XMLNode *Root);
 } RenderSerializedState;
 
+typedef enum SerializationPendingID {
+	PendingNone,
+	PendingAnglesTrackBar,
+	PendingInverseKinematic
+} SerializationPendingID;
+
 typedef struct CompleteSerializedState {
+	SerializationPendingID PendingID;
 
 	CharacterSerializedState CharState;
 	InputSerializedState InputState;
@@ -77,25 +86,31 @@ typedef struct CompleteSerializedState {
 	bool HaveCharState, HaveInputState, HaveAnimationState, HaveRenderState;
 } CompleteSerializedState;
 
-	typedef enum SerializationPendingID {
-		PendingNone,
-		PendingAnglesTrackBar,
-		PendingInverseKinematic
-	} SerializationPendingID;
+typedef struct CompleteSerializedStates {
+	vector<CompleteSerializedState> PreviousStates, FutureStates;
+	CompleteSerializedState CurrentState;
+} CompleteSerializedStates;
 
 typedef class SerializationManager {
 private:
 
-	typedef struct StateFrame {
-		SerializationPendingID PendingID;
-		CompleteSerializedState State;
-	} StateFrame;
-
 	SerializationPendingID CurrentPendingID;
 	ULONGLONG PendingLastTime;
-	stack<StateFrame> StateFrames, ForwardStateFrames;
+
+	vector<CompleteSerializedState> StateFrames, ForwardStateFrames;
+
+	vector<CompleteSerializedStates> OtherStates;
 
 	SerializationManager(void) { };
+
+	void Serialize(CompleteSerializedState& State);
+	void Deserialize(CompleteSerializedState& State);
+
+	void LoadState(CompleteSerializedState& State, XMLDocument& Document, XMLNode* Root);
+	void SaveState(CompleteSerializedState& State, XMLDocument& Document, XMLNode* Root);
+
+	void LoadStates(CompleteSerializedStates& States, XMLDocument& Document, XMLNode* Root);
+	void SaveStates(CompleteSerializedStates& States, XMLDocument& Document, XMLNode* Root);
 
 	void InternalPushStateFrame(bool Forward);
 public:
@@ -108,11 +123,8 @@ public:
 	SerializationManager(SerializationManager const&) = delete;
 	void operator=(SerializationManager const&) = delete;
 
-	void Serialize(CompleteSerializedState& State);
-	void Deserialize(CompleteSerializedState& State);
-
-	void LoadFromFile(CompleteSerializedState& State, const wstring FileName);
-	void SaveToFile(CompleteSerializedState& State, const wstring FileName);
+	void LoadFromFile(const wstring FileName);
+	void SaveToFile(const wstring FileName);
 
 	void Tick(double dt);
 
