@@ -1,11 +1,14 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 #include <windows.h>
 
 #include <glm/glm.hpp>
+
+#include "ExternalGUI.hpp"
 
 using namespace std;
 using namespace glm;
@@ -39,6 +42,8 @@ private:
 	void EditCallback(const wstring Name, const wstring Text);
 	static void __stdcall TrackBarStaticCallback(const wchar_t* Name, float t);
 	void TrackBarCallback(const wstring Name, float t);
+	static void __stdcall TimelineStaticCallback(float Position, int32 SelectedID, TimelineItem* Items, int32 ItemsCount);
+	void TimelineCallback(float Position, int32 SelectedID, vector<TimelineItem> Items);
 public:
 	static Form& GetInstance(void) {
 		static Form Instance;
@@ -65,5 +70,6 @@ public:
 
 	void UpdateBlocking(void);
 	void UpdatePositionAndAngles(void);
+	void UpdateTimeline(void);
 	void FullUpdate(void);
 } Form;

@@ -29,8 +29,8 @@ object AnimationEditorForm: TAnimationEditorForm
     ParentCtl3D = False
     TabOrder = 0
     object ResetRootPosition: TButton
-      Left = 24
-      Top = 16
+      Left = 15
+      Top = 85
       Width = 105
       Height = 25
       Caption = 'Reset Root Position'
@@ -150,6 +150,34 @@ object AnimationEditorForm: TAnimationEditorForm
       Max = 3600
       TabOrder = 15
     end
+    object OpenFile: TButton
+      Left = 24
+      Top = 16
+      Width = 75
+      Height = 25
+      Caption = 'Open File'
+      TabOrder = 16
+      OnClick = OpenFileClick
+    end
+    object NewFile: TButton
+      Left = 24
+      Top = 47
+      Width = 75
+      Height = 25
+      Caption = 'New File'
+      TabOrder = 17
+      OnClick = NewFileClick
+    end
+    object TimelinePlaceholder: TPanel
+      Left = 496
+      Top = 16
+      Width = 769
+      Height = 89
+      BevelOuter = bvNone
+      Color = clHighlight
+      ParentBackground = False
+      TabOrder = 18
+    end
   end
   object OpenGLPanel: TPanel
     Left = 0
@@ -180,5 +208,15 @@ object AnimationEditorForm: TAnimationEditorForm
     OnMessage = ApplicationEventsMessage
     Left = 224
     Top = 264
+  end
+  object OpenDialog: TOpenTextFileDialog
+    Filter = '*.xml'
+    Left = 200
+    Top = 448
+  end
+  object NewDialog: TSaveTextFileDialog
+    Filter = '*.xml'
+    Left = 296
+    Top = 448
   end
 end

@@ -48,6 +48,9 @@
     <ClCompile Include="SerializationManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Form.hpp">
@@ -80,6 +83,9 @@
     <ClInclude Include="SerializationManager.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="texture.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="ColorFragmentShader.fragmentshader">
@@ -88,10 +94,24 @@
     <None Include="TransformVertexShader.vertexshader">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="Models\cube.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Models\plane.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Models\sphere.bin">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="manifest.manifest">
       <Filter>Resource Files</Filter>
     </Manifest>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Floor.bmp">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

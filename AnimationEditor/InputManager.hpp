@@ -14,7 +14,7 @@ typedef enum InputState {
 	None,
 	InverseKinematic,
 	InverseKinematicAutomate,
-	BoneRotation
+	AnimationPlaying
 } InputState;
 
 typedef struct InputSelection {

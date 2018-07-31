@@ -17,7 +17,17 @@ uniform vec3 LightAmbientColor;
 uniform vec3 LightDiffuseColor;
 uniform float LightPower;
 
+uniform sampler2D TextureSampler;
+uniform bool UseTexture;
+
 void main(){
+
+    vec4 MaterialColor;
+    
+    if (UseTexture)
+        MaterialColor = texture(TextureSampler, TexCoord);
+    else
+        MaterialColor = DiffuseColor;
 
     if (IsLightEnabled) {
         
@@ -33,12 +43,12 @@ void main(){
         float cosAlpha = clamp(dot(EyeDirection, Reflection), 0, 1);
 
         Color = 
-            DiffuseColor           * vec4(LightAmbientColor, 1) +
-            DiffuseColor           * vec4(LightDiffuseColor, 0) * LightPower * cosTheta         / (distance*distance) +
+            MaterialColor          * vec4(LightAmbientColor, 1) +
+            MaterialColor          * vec4(LightDiffuseColor, 0) * LightPower * cosTheta         / (distance*distance) +
             vec4(SpecularColor, 0) * vec4(LightDiffuseColor, 0) * LightPower * pow(cosAlpha, 5) / (distance*distance);
             
     } else {
     
-        Color = DiffuseColor;
+        Color = MaterialColor;
     }
 }

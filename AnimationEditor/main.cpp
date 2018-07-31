@@ -78,8 +78,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 	PhysicsManager::GetInstance().Initialize();
 	AnimationManager::GetInstance().Initialize();
 
+	SerializationManager::GetInstance().Initialize();
+
 	LastTick = GetTime();
 	aegRun();
+
+	aegFinalize();
+
+	UnloadExternalGUI();
 
 	return 0;
 }

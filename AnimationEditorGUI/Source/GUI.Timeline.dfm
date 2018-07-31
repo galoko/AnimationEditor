@@ -1,0 +1,29 @@
+object Timeline: TTimeline
+  Left = 0
+  Top = 0
+  Width = 451
+  Height = 305
+  Align = alClient
+  DoubleBuffered = True
+  Color = 14385992
+  ParentBackground = False
+  ParentColor = False
+  ParentDoubleBuffered = False
+  TabOrder = 0
+  OnResize = FrameResize
+  object Scene: TImage
+    Left = 0
+    Top = 0
+    Width = 451
+    Height = 305
+    Align = alClient
+    OnDblClick = SceneDblClick
+    OnMouseDown = SceneMouseDown
+    OnMouseMove = SceneMouseMove
+    OnMouseUp = SceneMouseUp
+    ExplicitLeft = 168
+    ExplicitTop = 40
+    ExplicitWidth = 105
+    ExplicitHeight = 105
+  end
+end

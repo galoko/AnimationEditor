@@ -3,9 +3,11 @@ unit GUI.MainForm;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, Vcl.StdCtrls, Vcl.AppEvnts,
-  GUI.ExternalInterface, Vcl.ComCtrls;
+  Winapi.Windows, Winapi.Messages,
+  System.SysUtils, System.Variants, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, Vcl.StdCtrls,
+  Vcl.AppEvnts, Vcl.ComCtrls, Vcl.ExtDlgs,
+  GUI.ExternalInterface, GUI.Timeline;
 
 type
   TAnimationEditorForm = class(TForm)
@@ -29,39 +31,45 @@ type
     XAxisBar: TTrackBar;
     YAxisBar: TTrackBar;
     ZAxisBar: TTrackBar;
+    OpenFile: TButton;
+    NewFile: TButton;
+    OpenDialog: TOpenTextFileDialog;
+    NewDialog: TSaveTextFileDialog;
+    TimelinePlaceholder: TPanel;
     procedure ApplicationEventsMessage(var Msg: tagMSG; var Handled: Boolean);
     procedure FormCreate(Sender: TObject);
     procedure ButtonClick(Sender: TObject);
     procedure CheckBoxClick(Sender: TObject);
-    procedure EditKeyDown(Sender: TObject; var Key: Word;
-      Shift: TShiftState);
+    procedure EditKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure EditKeyPress(Sender: TObject; var Key: Char);
     procedure TrackBarChange(Sender: TObject);
+    procedure OpenFileClick(Sender: TObject);
+    procedure NewFileClick(Sender: TObject);
+    procedure TimelineChange(Sender: TObject);
   private
     { Private declarations }
     IsInSetMode: Boolean;
 
     OpenGLWindow: HWND;
 
-    ButtonCallback: TButtonCallback;
-    CheckBoxCallback: TCheckBoxCallback;
-    EditCallback: TEditCallback;
-    TrackBarCallback: TTrackBarCallback;
+    Timeline: TTimeline;
 
     procedure SetupCallbacks(Component: TComponent);
   public
     { Public declarations }
-    procedure SetOpenGLWindow(Window: HWND);
+    ButtonCallback: TButtonCallback;
+    CheckBoxCallback: TCheckBoxCallback;
+    EditCallback: TEditCallback;
+    TrackBarCallback: TTrackBarCallback;
+    TimelineCallback: TTimelineCallback;
 
-    procedure SetButtonCallback(Callback: TButtonCallback);
-    procedure SetCheckBoxCallback(Callback: TCheckBoxCallback);
-    procedure SetEditCallback(Callback: TEditCallback);
-    procedure SetTrackBarCallback(Callback: TTrackBarCallback);
+    procedure SetOpenGLWindow(Window: HWND);
 
     procedure SetEnabled(const Name: String; IsEnabled: Boolean); reintroduce;
     procedure SetChecked(const Name: String; IsChecked: Boolean);
     procedure SetText(const Name, Text: String);
     procedure SetPosition(const Name: String; t: Single);
+    procedure SetTimelineState(Position: Single; SelectedID: Integer; const Items: TArray<TTimelineItem>);
   end;
 
 var
@@ -73,6 +81,10 @@ implementation
 
 procedure TAnimationEditorForm.FormCreate(Sender: TObject);
 begin
+  Timeline:= TTimeline.Create(Self);
+  Timeline.OnChange:= TimelineChange;
+  Timeline.Parent:= TimelinePlaceholder;
+
   SetupCallbacks(Self);
 end;
 
@@ -81,7 +93,10 @@ var
   SubComponent: TComponent;
 begin
   if Component is TButton then
-    TButton(Component).OnClick:= ButtonClick
+  begin
+    if not Assigned(TButton(Component).OnClick) then
+      TButton(Component).OnClick:= ButtonClick;
+  end
   else
   if Component is TCheckBox then
     TCheckBox(Component).OnClick:= CheckBoxClick
@@ -97,6 +112,18 @@ begin
 
   for SubComponent in Component do
     SetupCallbacks(SubComponent);
+end;
+
+procedure TAnimationEditorForm.OpenFileClick(Sender: TObject);
+begin
+  if OpenDialog.Execute and Assigned(EditCallback) then
+    EditCallback(PWideChar(OpenDialog.Name), PWideChar(OpenDialog.FileName));
+end;
+
+procedure TAnimationEditorForm.NewFileClick(Sender: TObject);
+begin
+  if NewDialog.Execute and Assigned(EditCallback) then
+    EditCallback(PWideChar(NewDialog.Name), PWideChar(NewDialog.FileName));
 end;
 
 procedure TAnimationEditorForm.ButtonClick(Sender: TObject);
@@ -121,8 +148,7 @@ begin
   end;
 end;
 
-procedure TAnimationEditorForm.EditKeyDown(Sender: TObject; var Key: Word;
-  Shift: TShiftState);
+procedure TAnimationEditorForm.EditKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 var
   Edit: TEdit;
 begin
@@ -160,8 +186,18 @@ begin
   end;
 end;
 
-procedure TAnimationEditorForm.ApplicationEventsMessage(var Msg: tagMSG;
-  var Handled: Boolean);
+procedure TAnimationEditorForm.TimelineChange(Sender: TObject);
+var
+  Items: TArray<TTimelineItem>;
+begin
+  if Assigned(TimelineCallback) then
+  begin
+    Items:= Timeline.Items;
+    TimelineCallback(Timeline.Position, Timeline.SelectedID, PTimelineItem(Items), Length(Items));
+  end;
+end;
+
+procedure TAnimationEditorForm.ApplicationEventsMessage(var Msg: tagMSG; var Handled: Boolean);
 begin
   // keys redirect
   if Msg.hwnd <> OpenGLWindow then
@@ -176,26 +212,6 @@ begin
   Winapi.Windows.SetParent(OpenGLWindow, OpenGLPanel.Handle);
   SetWindowPos(OpenGLWindow, 0, 0, 0, 0, 0, SWP_NOSIZE or SWP_NOZORDER);
   ShowWindow(OpenGLWindow, SW_SHOWNA);
-end;
-
-procedure TAnimationEditorForm.SetButtonCallback(Callback: TButtonCallback);
-begin
-  ButtonCallback:= Callback;
-end;
-
-procedure TAnimationEditorForm.SetCheckBoxCallback(Callback: TCheckBoxCallback);
-begin
-  CheckBoxCallback:= Callback;
-end;
-
-procedure TAnimationEditorForm.SetEditCallback(Callback: TEditCallback);
-begin
-  EditCallback:= Callback;
-end;
-
-procedure TAnimationEditorForm.SetTrackBarCallback(Callback: TTrackBarCallback);
-begin
-  TrackBarCallback:= Callback;
 end;
 
 procedure TAnimationEditorForm.SetEnabled(const Name: String;
@@ -274,6 +290,18 @@ begin
     IsInSetMode:= True;
     TrackBar.Position:= Position;
     IsInSetMode:= False;
+  end;
+end;
+
+procedure TAnimationEditorForm.SetTimelineState(Position: Single; SelectedID: Integer; const Items: TArray<TTimelineItem>);
+begin
+  Timeline.Lock;
+  try
+    Timeline.Position:= Position;
+    Timeline.SelectedID:= SelectedID;
+    Timeline.Items:= Items;
+  finally
+    Timeline.Unlock;
   end;
 end;
 

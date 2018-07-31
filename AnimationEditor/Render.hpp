@@ -33,7 +33,8 @@ private:
 		ShaderID,
 		ProjectionID, ViewID, ModelID, ModelNormalID,
 		DiffuseColorID, SpecularColorID,
-		IsLightEnabledID, LightPositionID, LightDirectionID, LightAmbientColorID, LightDiffuseColorID, LightPowerID;
+		IsLightEnabledID, LightPositionID, LightDirectionID, LightAmbientColorID, LightDiffuseColorID, LightPowerID,
+		SamplerID, UseTextureID, FloorTextureID;
 
 	mat4 Projection, View;
 
@@ -49,6 +50,7 @@ private:
 	void SetWireframeMode(bool IsWireFrame);
 	void EnableLighting(bool Enabled);
 	void SetColors(vec4 DiffuseColor, vec3 SpecularColor = { 0, 0, 0 });
+	void SetTexture(GLint TextureID);
 
 	void DrawCube(vec3 Position, mat4 Rotation, vec3 Size);
 	void DrawCube(mat4 Model, vec3 Size);

@@ -73,6 +73,7 @@
         <DCC_F>false</DCC_F>
         <DCC_K>false</DCC_K>
         <GenDll>true</GenDll>
+        <DCC_IOChecking>false</DCC_IOChecking>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
@@ -138,6 +139,11 @@
         <DCCReference Include="GUI.MainForm.pas">
             <Form>AnimationEditorForm</Form>
             <FormType>dfm</FormType>
+        </DCCReference>
+        <DCCReference Include="GUI.Timeline.pas">
+            <Form>Timeline</Form>
+            <FormType>dfm</FormType>
+            <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

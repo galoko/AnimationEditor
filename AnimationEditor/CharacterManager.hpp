@@ -12,8 +12,6 @@ private:
 	CharacterManager(void) { };
 
 	Character* Char;
-
-	uint32 AnimationTimestamp;
 public:
 	static CharacterManager& GetInstance(void) {
 		static CharacterManager Instance;
@@ -26,6 +24,8 @@ public:
 
 	void Initialize(void);
 	Character* GetCharacter(void);
+
+	uint32 AnimationTimestamp;
 
 	void Serialize(CharacterSerializedState& State);
 	void Deserialize(CharacterSerializedState& State);

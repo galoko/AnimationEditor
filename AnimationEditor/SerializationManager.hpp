@@ -11,6 +11,8 @@
 
 #include <tinyxml2.h>
 
+#include "ExternalGUI.hpp"
+
 using namespace std;
 using namespace glm;
 using namespace tinyxml2;
@@ -75,7 +77,7 @@ typedef enum SerializationPendingID {
 	PendingInverseKinematic
 } SerializationPendingID;
 
-typedef struct CompleteSerializedState {
+typedef struct SingleSerializedState {
 	SerializationPendingID PendingID;
 
 	CharacterSerializedState CharState;
@@ -84,35 +86,57 @@ typedef struct CompleteSerializedState {
 	RenderSerializedState RenderState;
 
 	bool HaveCharState, HaveInputState, HaveAnimationState, HaveRenderState;
-} CompleteSerializedState;
+} SingleSerializedState;
 
-typedef struct CompleteSerializedStates {
-	vector<CompleteSerializedState> PreviousStates, FutureStates;
-	CompleteSerializedState CurrentState;
-} CompleteSerializedStates;
+typedef struct SerializedStateHistory {
+	int32 ID;
+	vector<SingleSerializedState> PreviousStates, FutureStates;
+	SingleSerializedState CurrentState;
+} SerializedStateHistory;
 
 typedef class SerializationManager {
 private:
 
-	SerializationPendingID CurrentPendingID;
 	ULONGLONG PendingLastTime;
 
-	vector<CompleteSerializedState> StateFrames, ForwardStateFrames;
+	vector<SerializedStateHistory> Histories;
 
-	vector<CompleteSerializedStates> OtherStates;
+	int32 NextStateHistoryID;
+
+	wstring LastFileName;
+	ULONGLONG LastAutosaveTime;
+
+	const wstring SettingsFileName = L"Settings.xml";
 
 	SerializationManager(void) { };
 
-	void Serialize(CompleteSerializedState& State);
-	void Deserialize(CompleteSerializedState& State);
+	void LoadSettings(void);
+	void SaveSettings(void);
 
-	void LoadState(CompleteSerializedState& State, XMLDocument& Document, XMLNode* Root);
-	void SaveState(CompleteSerializedState& State, XMLDocument& Document, XMLNode* Root);
+	void Serialize(void);
+	void Deserialize(void);
 
-	void LoadStates(CompleteSerializedStates& States, XMLDocument& Document, XMLNode* Root);
-	void SaveStates(CompleteSerializedStates& States, XMLDocument& Document, XMLNode* Root);
+	void LoadState(SingleSerializedState& State, XMLDocument& Document, XMLNode* Root);
+	void SaveState(SingleSerializedState& State, XMLDocument& Document, XMLNode* Root);
+
+	void LoadStates(SerializedStateHistory& States, XMLDocument& Document, XMLNode* Root);
+	void SaveStates(SerializedStateHistory& States, XMLDocument& Document, XMLNode* Root);
 
 	void InternalPushStateFrame(bool Forward);
+	void LimitFrames(vector<SingleSerializedState>& Frames, int Limit);
+
+	const int AutosaveInterval = 30 * 1000;
+
+	const int MaxBackupCount = 1000;
+
+	const int MaxFrames = 100;
+
+	bool IsFileOpen(void);
+
+	vector<SerializedStateHistory>::iterator GetCurrentHistory(void);
+	vector<SerializedStateHistory>::iterator GetHistoryByID(int32 ID);
+
+	void SafeSaveDocumentToFile(XMLDocument& Document, const wstring FileName, int BackupCount);
 public:
 	static SerializationManager& GetInstance(void) {
 		static SerializationManager Instance;
@@ -123,10 +147,19 @@ public:
 	SerializationManager(SerializationManager const&) = delete;
 	void operator=(SerializationManager const&) = delete;
 
+	void Initialize(void);
+
+	void CreateNewHistories(void);
+
 	void LoadFromFile(const wstring FileName);
 	void SaveToFile(const wstring FileName);
 
+	void Autosave(void);
+
 	void Tick(double dt);
+
+	bool LoadHistoryByID(int32 ID);
+	int32 GetCurrentHistoryID(void);
 
 	const int PendingTimeout = 250;
 
@@ -134,4 +167,6 @@ public:
 	void PushPendingStateFrame(SerializationPendingID PendingID, const wstring Sender);
 	void PopAndDeserializeStateFrame(bool Forward);
 
+	vector<TimelineItem> GetTimelineItems(void);
+	void SetTimelineItems(vector<TimelineItem> Items);
 } SerializationManager;

@@ -110,6 +110,25 @@ void AnimationManager::UnblockAllBones(void)
 		SetBoneBlocking(Bone, AllUnblocked);
 }
 
+float AnimationManager::GetAnimationPosition(void)
+{
+	return AnimationPosition;
+}
+
+bool AnimationManager::IsInKinematicMode(void)
+{
+	return KinematicModeFlag;
+}
+
+void AnimationManager::SetAnimationState(float Position, int32 SelectedID)
+{
+	AnimationPosition = Position;
+
+	KinematicModeFlag = (SelectedID <= 0) || !SerializationManager::GetInstance().LoadHistoryByID(SelectedID);
+
+	Form::GetInstance().UpdateTimeline();
+}
+
 void AnimationManager::Serialize(AnimationSerializedState& State)
 {
 	State.Contexts.clear();

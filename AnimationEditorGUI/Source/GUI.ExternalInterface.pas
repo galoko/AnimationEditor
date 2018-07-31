@@ -4,13 +4,15 @@ interface
 
 uses
   Winapi.Windows,
-  Vcl.Forms;
+  Vcl.Forms,
+  GUI.Timeline;
 
 type
   TButtonCallback = procedure (const Name: PWideChar); stdcall;
   TCheckBoxCallback = procedure (const Name: PWideChar; IsChecked: Boolean); stdcall;
   TEditCallback = procedure (const Name, Text: PWideChar); stdcall;
   TTrackBarCallback = procedure (const Name: PWideChar; t: Single); stdcall;
+  TTimelineCallback = procedure (Position: Single; SelectedID: Integer; Items: PTimelineItem; ItemsCount: Integer); stdcall;
   TIdleCallback = procedure; stdcall;
 
 procedure aegInitialize; stdcall;
@@ -21,13 +23,16 @@ procedure aegSetButtonCallback(Callback: TButtonCallback); stdcall;
 procedure aegSetCheckBoxCallback(Callback: TCheckBoxCallback); stdcall;
 procedure aegSetEditCallback(Callback: TEditCallback); stdcall;
 procedure aegSetTrackBarCallback(Callback: TTrackBarCallback); stdcall;
+procedure aegSetTimelineCallback(Callback: TTimelineCallback); stdcall;
 
 procedure aegSetEnabled(const Name: PWideChar; IsEnabled: Boolean); stdcall;
 procedure aegSetChecked(const Name: PWideChar; IsChecked: Boolean); stdcall;
 procedure aegSetText(const Name, Text: PWideChar); stdcall;
 procedure aegSetPosition(const Name: PWideChar; t: Single); stdcall;
+procedure aegSetTimelineState(Position: Single; SelectedID: Integer; Items: PTimelineItem; ItemsCount: Integer); stdcall;
 
 procedure aegRun; stdcall;
+procedure aegFinalize; stdcall;
 
 implementation
 
@@ -43,13 +48,16 @@ exports
   aegSetCheckBoxCallback,
   aegSetEditCallback,
   aegSetTrackBarCallback,
+  aegSetTimelineCallback,
 
   aegSetEnabled,
   aegSetChecked,
   aegSetText,
   aegSetPosition,
+  aegSetTimelineState,
 
-  aegRun;
+  aegRun,
+  aegFinalize;
 
 type
   Dummy = class abstract
@@ -77,22 +85,27 @@ end;
 
 procedure aegSetButtonCallback(Callback: TButtonCallback);
 begin
-  AnimationEditorForm.SetButtonCallback(Callback);
+  AnimationEditorForm.ButtonCallback:= Callback;
 end;
 
 procedure aegSetCheckBoxCallback(Callback: TCheckBoxCallback);
 begin
-  AnimationEditorForm.SetCheckBoxCallback(Callback);
+  AnimationEditorForm.CheckBoxCallback:= Callback;
 end;
 
 procedure aegSetEditCallback(Callback: TEditCallback);
 begin
-  AnimationEditorForm.SetEditCallback(Callback);
+  AnimationEditorForm.EditCallback:= Callback;
 end;
 
 procedure aegSetTrackBarCallback(Callback: TTrackBarCallback);
 begin
-  AnimationEditorForm.SetTrackBarCallback(Callback);
+  AnimationEditorForm.TrackBarCallback:= Callback;
+end;
+
+procedure aegSetTimelineCallback(Callback: TTimelineCallback);
+begin
+  AnimationEditorForm.TimelineCallback:= Callback;
 end;
 
 procedure aegSetEnabled(const Name: PWideChar; IsEnabled: Boolean);
@@ -115,9 +128,25 @@ begin
   AnimationEditorForm.SetPosition(Name, t);
 end;
 
-procedure aegRun; stdcall;
+procedure aegSetTimelineState(Position: Single; SelectedID: Integer; Items: PTimelineItem; ItemsCount: Integer);
+var
+  ItemsArray: TArray<TTimelineItem>;
+begin
+  SetLength(ItemsArray, ItemsCount);
+  if ItemsCount > 0 then
+    Move(Items^, ItemsArray[0], Length(ItemsArray) * SizeOf(ItemsArray[0]));
+
+  AnimationEditorForm.SetTimelineState(Position, SelectedID, ItemsArray);
+end;
+
+procedure aegRun;
 begin
   Application.Run;
+end;
+
+procedure aegFinalize;
+begin
+  //
 end;
 
 { Dummy }

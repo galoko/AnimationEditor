@@ -165,6 +165,7 @@ void InputManager::ProcessCameraMovement(double dt)
 	vec3 Direction = Render::GetInstance().GetLookingDirection();
 	vec3 SideDirection = cross(Direction, Render::GetInstance().Up);
 	vec3 ForwardDirection = cross(Render::GetInstance().Up, SideDirection);
+	vec3 UpDirection = Render::GetInstance().Up;
 
 	if (IsPressed('W'))
 		Offset += ForwardDirection;
@@ -174,6 +175,10 @@ void InputManager::ProcessCameraMovement(double dt)
 		Offset += SideDirection;
 	if (IsPressed('A'))
 		Offset -= SideDirection;
+	if (IsPressed(VK_LSHIFT))
+		Offset -= UpDirection;
+	if (IsPressed(VK_SPACE))
+		Offset += UpDirection;
 
 	if (length(Offset) > 0) {
 
@@ -327,15 +332,11 @@ void InputManager::ProcessKeyboardInput(double dt) {
 	if (WasPressed(VK_F9))
 		SerializationManager::GetInstance().LoadFromFile(L"H:\\test.xml");
 
-	if (WasPressed('R') && Selection.HaveBone()) {
+	if (WasPressed('U') && Selection.HaveBone()) {
 
-		SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput R");
+		SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput U");
 
-		if (IsPressed(VK_LCONTROL)) {
-
-			AnimationManager::GetInstance().BlockEverythingExceptThisBranch(Selection.Bone->Parent, Selection.Bone);
-		}
-		else {
+		if (!IsPressed(VK_LCONTROL)) {
 
 			BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
 			if (Blocking.IsFullyBlocked())
@@ -345,6 +346,8 @@ void InputManager::ProcessKeyboardInput(double dt) {
 
 			AnimationManager::GetInstance().SetBoneBlocking(Selection.Bone, Blocking);
 		}
+		else 
+			AnimationManager::GetInstance().BlockEverythingExceptThisBranch(Selection.Bone->Parent, Selection.Bone);
 	}
 
 	if (IsPressed(VK_LCONTROL)) {
@@ -358,18 +361,35 @@ void InputManager::ProcessKeyboardInput(double dt) {
 			SerializationManager::GetInstance().PopAndDeserializeStateFrame(true);
 	}
 
-	if (WasPressed('U')) {
+	if (WasPressed('R')) {
 
 		InputSelection Selection = InputManager::GetInstance().GetSelection();
 
 		if (Selection.HaveBone()) {
 
-			SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput U");
+			SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput R");
 
 			if (!AnimationManager::GetInstance().IsBonePositionConstrained(Selection.Bone))
 				AnimationManager::GetInstance().ConstrainBonePosition(Selection.Bone, Selection.GetWorldPoint());
 			else
 				AnimationManager::GetInstance().RemoveBonePositionConstraint(Selection.Bone);
+		}
+	}
+
+	if (WasPressed('I')) {
+
+		InputSelection Selection = InputManager::GetInstance().GetSelection();
+
+		if (Selection.HaveBone()) {
+
+			SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput I");
+
+			Character* Char = CharacterManager::GetInstance().GetCharacter();
+
+			Selection.Bone->Rotation = mat4(1.0f);
+			Char->UpdateWorldTranforms();
+
+			PhysicsManager::GetInstance().SyncWorldWithCharacter();
 		}
 	}
 

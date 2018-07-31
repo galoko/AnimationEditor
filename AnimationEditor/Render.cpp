@@ -17,6 +17,7 @@
 #include "AnimationManager.hpp"
 #include "CharacterManager.hpp"
 #include "shader.hpp"
+#include "texture.hpp"
 
 void Render::DrawScene(void) {
 
@@ -92,8 +93,9 @@ void Render::DrawCharacter(Character* Char) {
 void Render::DrawFloor(void) {
 
 	SetWireframeMode(false);
-	EnableLighting(true);
-	SetColors({ 0, 0, 0, 1 });
+	EnableLighting(false);
+	// SetColors({ 0, 0, 0, 1 });
+	SetTexture(FloorTextureID);
 
 	vec3 Position = PhysicsManager::GetInstance().GetFloorPosition();
 	vec3 Size = PhysicsManager::GetInstance().GetFloorSize();
@@ -314,8 +316,15 @@ void Render::EnableLighting(bool Enabled) {
 
 void Render::SetColors(vec4 DiffuseColor, vec3 SpecularColor) {
 
+	glUniform1i(UseTextureID, GL_FALSE);
 	glUniform4fv(DiffuseColorID, 1, value_ptr(DiffuseColor));
 	glUniform3fv(SpecularColorID, 1, value_ptr(SpecularColor));
+}
+
+void Render::SetTexture(GLint TextureID)
+{
+	glUniform1i(UseTextureID, GL_TRUE);
+	glBindTexture(GL_TEXTURE_2D, TextureID);
 }
 
 void Render::DrawCube(vec3 Position, mat4 Rotation, vec3 Size) {
@@ -494,6 +503,20 @@ void Render::Initialize(HWND WindowHandle) {
 
 	Projection = perspective(radians(45.0f), AspectRatio, 0.1f, 100.0f);
 	glUniformMatrix4fv(ProjectionID, 1, GL_FALSE, value_ptr(Projection));
+
+	// Load textures
+
+	SamplerID = glGetUniformLocation(ShaderID, "TextureSampler");
+	UseTextureID = glGetUniformLocation(ShaderID, "UseTexture");
+
+	FloorTextureID = loadBMP("Floor.bmp");
+
+	glActiveTexture(GL_TEXTURE0);
+	glUniform1i(SamplerID, 0);
+
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	// Camera matrix
 

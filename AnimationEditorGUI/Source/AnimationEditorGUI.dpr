@@ -8,7 +8,8 @@ uses
   madListModules,
   Winapi.Windows,
   GUI.ExternalInterface in 'GUI.ExternalInterface.pas',
-  GUI.MainForm in 'GUI.MainForm.pas' {AnimationEditorForm};
+  GUI.MainForm in 'GUI.MainForm.pas' {AnimationEditorForm},
+  GUI.Timeline in 'GUI.Timeline.pas' {Timeline: TFrame};
 
 {$R *.res}
 

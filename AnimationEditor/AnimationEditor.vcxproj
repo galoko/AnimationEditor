@@ -30,6 +30,7 @@
     <ClCompile Include="Render.cpp" />
     <ClCompile Include="SerializationManager.cpp" />
     <ClCompile Include="shader.cpp" />
+    <ClCompile Include="texture.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AnimationManager.hpp" />
@@ -42,13 +43,20 @@
     <ClInclude Include="Render.hpp" />
     <ClInclude Include="SerializationManager.hpp" />
     <ClInclude Include="shader.hpp" />
+    <ClInclude Include="texture.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="manifest.manifest" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ColorFragmentShader.fragmentshader" />
+    <None Include="Models\cube.bin" />
+    <None Include="Models\plane.bin" />
+    <None Include="Models\sphere.bin" />
     <None Include="TransformVertexShader.vertexshader" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Floor.bmp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -122,6 +130,8 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <FloatingPointModel>Precise</FloatingPointModel>
       <PreprocessorDefinitions>BT_THREADSAFE=1;BT_USE_DOUBLE_PRECISION;_DEBUG=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>
+      </LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>E:\Projects\Code\Others\tinyxml2\tinyxml2\bin\tinyxml2\x64-Debug-Lib;E:\Projects\Code\Others\bullet3\bin;E:\Projects\Code\Others\glew-2.1.0\lib\Release\x64</AdditionalLibraryDirectories>
@@ -153,6 +163,8 @@
       <AdditionalIncludeDirectories>E:\Projects\Code\Others\tinyxml2-ex;E:\Projects\Code\Others\tinyxml2;E:\Projects\Code\Others\bullet3\src;E:\Projects\Code\Others\glm;E:\Projects\Code\Others\glew-2.1.0\include</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>BT_THREADSAFE=1;BT_USE_DOUBLE_PRECISION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>
+      </LanguageStandard>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

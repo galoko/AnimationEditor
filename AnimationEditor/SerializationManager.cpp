@@ -10,9 +10,36 @@
 #include "AnimationManager.hpp"
 #include "Render.hpp"
 
-void SerializationManager::Serialize(CompleteSerializedState& State)
+void SerializationManager::Initialize(void)
 {
-	State.PendingID = CurrentPendingID;
+	NextStateHistoryID = 1;
+
+	LoadSettings();
+}
+
+void SerializationManager::CreateNewHistories(void)
+{
+	Histories.clear();
+
+	CharacterManager::GetInstance().GetCharacter()->Reset();
+
+	SerializedStateHistory History = {};
+
+	History.ID = NextStateHistoryID++;
+
+	CharacterManager::GetInstance().Serialize(History.CurrentState.CharState);
+	History.CurrentState.HaveCharState = true;
+	History.CurrentState.HaveInputState = true;
+	History.CurrentState.HaveAnimationState = true;
+
+	Histories.push_back(History);
+
+	Deserialize();
+}
+
+void SerializationManager::Serialize(void)
+{
+	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
 
 	if (State.HaveCharState)
 		CharacterManager::GetInstance().Serialize(State.CharState);
@@ -27,10 +54,11 @@ void SerializationManager::Serialize(CompleteSerializedState& State)
 		Render::GetInstance().Serialize(State.RenderState);
 }
 
-void SerializationManager::Deserialize(CompleteSerializedState& State)
+void SerializationManager::Deserialize(void)
 {
-	CurrentPendingID = State.PendingID;
 	PendingLastTime = GetTickCount64();
+
+	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
 
 	if (State.HaveRenderState)
 		Render::GetInstance().Deserialize(State.RenderState);
@@ -45,109 +73,119 @@ void SerializationManager::Deserialize(CompleteSerializedState& State)
 		AnimationManager::GetInstance().Deserialize(State.AnimationState);
 }
 
-void SerializationManager::LoadFromFile(const wstring FileName)
+void SerializationManager::Autosave(void)
 {
-	FILE* File = _wfopen(FileName.c_str(), L"rb");
-	if (File == nullptr)
-		return;
-
-	XMLDocument Document;
-
-	Document.LoadFile(File);
-
-	XMLNode* Root = Document.FirstChildElement("Root");
-	if (Root != nullptr) {
-
-		OtherStates.clear();
-
-		for (auto StatesElement : selection(Root->ToElement(), "States")) {
-
-			CompleteSerializedStates States;
-
-			LoadStates(States, Document, StatesElement);
-
-			OtherStates.push_back(States);
-		}
-
-		if (!OtherStates.empty()) {
-
-			CompleteSerializedStates ActiveStates = OtherStates.back();
-			OtherStates.pop_back();
-
-			Deserialize(ActiveStates.CurrentState);
-			StateFrames = ActiveStates.PreviousStates;
-			ForwardStateFrames = ActiveStates.FutureStates;
-		}
-	}
-
-	fclose(File);
-}
-
-void SerializationManager::SaveToFile(const wstring FileName)
-{
-	XMLDocument Document;
-
-	XMLNode* Root = Document.NewElement("Root");
-	Document.InsertFirstChild(Root);
-
-	for (CompleteSerializedStates States : OtherStates) {
-
-		XMLElement* StatesElement = Document.NewElement("States");
-		Root->InsertEndChild(StatesElement);
-
-		SaveStates(States, Document, StatesElement);
-	}
-
-	CompleteSerializedStates ActiveStates;
-
-	ActiveStates.PreviousStates = StateFrames;
-	ActiveStates.FutureStates = ForwardStateFrames;
-
-	ActiveStates.CurrentState.HaveCharState = true;
-	ActiveStates.CurrentState.HaveInputState = true;
-	ActiveStates.CurrentState.HaveAnimationState = true;
-	ActiveStates.CurrentState.HaveRenderState = true;
-	Serialize(ActiveStates.CurrentState);
-
-	XMLElement* StatesElement = Document.NewElement("States");
-	Root->InsertEndChild(StatesElement);
-	SaveStates(ActiveStates, Document, StatesElement);
-
-	FILE* File = _wfopen(FileName.c_str(), L"wb");
-	Document.SaveFile(File, false);
-	fclose(File);
+	SaveToFile(LastFileName);
 }
 
 void SerializationManager::Tick(double dt)
 {
-
+	if (IsFileOpen()) {
+		ULONGLONG Now = GetTickCount64();
+		if (LastAutosaveTime + AutosaveInterval < Now)
+			Autosave();
+	}
 }
 
 void SerializationManager::InternalPushStateFrame(bool Forward)
 {
-	CompleteSerializedState State;
-
+	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
 	State.HaveCharState = true;
 	State.HaveInputState = true;
 	State.HaveAnimationState = true;
 	State.HaveRenderState = false;
+	Serialize();
 
-	Serialize(State);
+	vector<SingleSerializedState>& DestStates =
+		Forward ? GetCurrentHistory()->FutureStates : GetCurrentHistory()->PreviousStates;
 
-	if (Forward)
-		ForwardStateFrames.push_back(State);
-	else
-		StateFrames.push_back(State);
+	DestStates.push_back(State);
 
-	CurrentPendingID = PendingNone;
+	LimitFrames(DestStates, MaxFrames);
+
+	State.PendingID = PendingNone;
 	PendingLastTime = 0;
+}
+
+void SerializationManager::LimitFrames(vector<SingleSerializedState>& Frames, int Limit)
+{
+	if (Frames.size() > Limit) {
+		move(Frames.end() - Limit, Frames.end(), Frames.begin());
+		Frames.resize(Limit);
+	}
+}
+
+bool SerializationManager::LoadHistoryByID(int32 ID)
+{
+	auto CurrentHistory = GetCurrentHistory();
+
+	if (CurrentHistory->ID == ID)
+		return true;
+
+	auto NextHistory = GetHistoryByID(ID);
+	if (NextHistory == Histories.end())
+		return false;
+
+	iter_swap(CurrentHistory, NextHistory);
+
+	GetCurrentHistory()->CurrentState.HaveRenderState = false;
+	Deserialize();
+
+	return true;
+}
+
+int32 SerializationManager::GetCurrentHistoryID(void)
+{
+	return GetCurrentHistory()->ID;
+}
+
+bool SerializationManager::IsFileOpen(void)
+{
+	return LastFileName != L"";
+}
+
+vector<SerializedStateHistory>::iterator SerializationManager::GetCurrentHistory(void)
+{
+	return Histories.end() - 1;
+}
+
+vector<SerializedStateHistory>::iterator SerializationManager::GetHistoryByID(int32 ID)
+{
+	for (std::vector<SerializedStateHistory>::iterator History = Histories.begin(); History != Histories.end(); ++History) {
+		if (History->ID == ID)
+			return History;
+	}
+
+	return Histories.end();
+}
+
+void SerializationManager::SafeSaveDocumentToFile(XMLDocument& Document, const wstring FileName, int BackupCount)
+{
+	wstring FileNameNoExt = FileName.substr(0, FileName.find_last_of(L"."));
+
+	wstring TempFileName = FileNameNoExt + L".tmp";
+	wstring XmlFileName = FileNameNoExt + L".xml";
+	wstring BackupFileName = FileNameNoExt + L".backup";
+
+	FILE* File = _wfopen(TempFileName.c_str(), L"wb");
+	Document.SaveFile(File, false);
+	fclose(File);
+
+	BOOL Result;
+
+	Result = MoveFileEx(XmlFileName.c_str(), BackupFileName.c_str(), MOVEFILE_REPLACE_EXISTING) || (GetLastError() == ERROR_FILE_NOT_FOUND);
+	if (Result)
+		Result = MoveFileEx(TempFileName.c_str(), XmlFileName.c_str(), MOVEFILE_REPLACE_EXISTING);
+
+	if (!Result)
+		printf("Failed to rename tmp file\n");
 }
 
 void SerializationManager::PushStateFrame(const wstring Sender)
 {
 	printf("PUSH STATE, SENDER: %ws\n", Sender.c_str());
 
-	ForwardStateFrames.clear();
+	GetCurrentHistory()->FutureStates.clear();
 
 	InternalPushStateFrame(false);
 }
@@ -158,25 +196,54 @@ void SerializationManager::PushPendingStateFrame(SerializationPendingID PendingI
 
 	ULONGLONG Now = GetTickCount64();
 
-	if (CurrentPendingID != PendingID || PendingLastTime + PendingTimeout <= Now)
+	if (GetCurrentHistory()->CurrentState.PendingID != PendingID || PendingLastTime + PendingTimeout <= Now)
 		PushStateFrame(L"Pending (" + Sender + L")");
 
-	CurrentPendingID = PendingID;
+	GetCurrentHistory()->CurrentState.PendingID = PendingID;
 	PendingLastTime = Now;
 }
 
 void SerializationManager::PopAndDeserializeStateFrame(bool Forward)
 {
-	vector<CompleteSerializedState>* StackToUse = Forward ? &ForwardStateFrames : &StateFrames;
+	vector<SingleSerializedState>& StackToUse = Forward ? GetCurrentHistory()->FutureStates : GetCurrentHistory()->PreviousStates;
 
-	if (!StackToUse->empty()) {
+	if (!StackToUse.empty()) {
 
 		InternalPushStateFrame(!Forward);
 
-		CompleteSerializedState State = StackToUse->back();
-		StackToUse->pop_back();
+		GetCurrentHistory()->CurrentState = StackToUse.back();
+		StackToUse.pop_back();
 
-		Deserialize(State);
+		Deserialize();
+	}
+}
+
+vector<TimelineItem> SerializationManager::GetTimelineItems(void)
+{
+	vector<TimelineItem> Result;
+
+	for (SerializedStateHistory& History : Histories) {
+		TimelineItem Item = { History.ID, History.CurrentState.CharState.AnimationTimestamp / 1000.0f };
+		Result.push_back(Item);
+	}
+
+	return Result;
+}
+
+void SerializationManager::SetTimelineItems(vector<TimelineItem> Items)
+{
+	int32 CurrentID = GetCurrentHistory()->ID;
+
+	for (TimelineItem& Item : Items) {
+
+		uint32 Timestamp = (uint32)(Item.Position * 1000.0f);
+
+		if (Item.ID == CurrentID)
+			CharacterManager::GetInstance().AnimationTimestamp = Timestamp;
+
+		auto History = GetHistoryByID(Item.ID);
+		if (History != Histories.end())
+			History->CurrentState.CharState.AnimationTimestamp = Timestamp;
 	}
 }
 
@@ -209,13 +276,13 @@ float attribute_float_value(XMLElement* Element, const char* AttributeName) {
 	return Result;
 }
 
-bool attribute_bool_value(XMLElement* Element, const char* AttributeName) {
+bool attribute_bool_value(XMLElement* Element, const char* AttributeName, bool DefaultValue = true) {
 
 	bool Result;
 
 	const XMLAttribute* Attribute = Element->FindAttribute(AttributeName);
 	if (Attribute == nullptr || Attribute->QueryBoolValue(&Result) != XML_SUCCESS)
-		Result = true;
+		Result = DefaultValue;
 
 	return Result;
 }
@@ -231,7 +298,125 @@ uint32 attribute_uint32_value(XMLElement* Element, const char* AttributeName) {
 	return Result;
 }
 
-void SerializationManager::LoadState(CompleteSerializedState& State, XMLDocument& Document, XMLNode* Root)
+void SerializationManager::LoadFromFile(const wstring FileName)
+{
+	FILE* File = _wfopen(FileName.c_str(), L"rb");
+	if (File == nullptr)
+		return;
+
+	XMLDocument Document;
+	Document.LoadFile(File);
+	fclose(File);
+
+	float Position = 0.0f;
+	bool KinematicModeFlag = false;
+
+	Histories.clear();
+
+	XMLNode* Root = Document.FirstChildElement("Root");
+	if (Root != nullptr) {		
+
+		for (auto StatesElement : selection(Root->ToElement(), "States")) {
+
+			SerializedStateHistory States;
+
+			LoadStates(States, Document, StatesElement);
+
+			Histories.push_back(States);
+		}
+
+		if (!Histories.empty())
+			Deserialize();
+
+		XMLElement* AnimationElement = Root->FirstChildElement("Animation");
+		if (AnimationElement != nullptr) {
+
+			Position = attribute_float_value(AnimationElement, "Position");
+			KinematicModeFlag = attribute_bool_value(AnimationElement, "KinematicMode", false);
+		}
+	}
+
+	AnimationManager::GetInstance().SetAnimationState(Position, KinematicModeFlag ? 0 : GetCurrentHistoryID());
+
+	if (LastFileName != FileName) {
+
+		LastFileName = FileName;
+
+		SaveSettings();
+	}
+
+	LastAutosaveTime = GetTickCount64();
+}
+
+void SerializationManager::SaveToFile(const wstring FileName)
+{
+	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
+	State.HaveCharState = true;
+	State.HaveInputState = true;
+	State.HaveAnimationState = true;
+	State.HaveRenderState = true;
+	Serialize();
+
+	XMLDocument Document;
+
+	XMLNode* Root = Document.NewElement("Root");
+	Document.InsertFirstChild(Root);
+
+	for (SerializedStateHistory States : Histories) {
+
+		XMLElement* StatesElement = Document.NewElement("States");
+		Root->InsertEndChild(StatesElement);
+
+		SaveStates(States, Document, StatesElement);
+	}
+
+	XMLElement* AnimationState = Document.NewElement("Animation");
+	Root->InsertEndChild(AnimationState);
+	AnimationState->SetAttribute("Position", AnimationManager::GetInstance().GetAnimationPosition());
+	AnimationState->SetAttribute("KinematicMode", AnimationManager::GetInstance().IsInKinematicMode());
+
+	SafeSaveDocumentToFile(Document, FileName, MaxBackupCount);
+
+	LastAutosaveTime = GetTickCount64();
+}
+
+void SerializationManager::LoadSettings(void)
+{
+	FILE* File = _wfopen(SettingsFileName.c_str(), L"rb");
+	if (File == nullptr)
+		return;
+
+	XMLDocument Document;
+	Document.LoadFile(File);
+	fclose(File);
+
+	XMLNode* Settings = Document.FirstChildElement("Settings");
+	if (Settings != nullptr) {
+
+		XMLElement* LastFile = Settings->FirstChildElement("LastFile");
+		if (LastFile != nullptr)
+			LastFileName = s2ws(attribute_value(LastFile, "Name"));
+	}
+
+	if (IsFileOpen())
+		LoadFromFile(LastFileName);
+}
+
+void SerializationManager::SaveSettings(void)
+{
+	XMLDocument Document;
+
+	XMLNode* Settings = Document.NewElement("Settings");
+	Document.InsertFirstChild(Settings);
+
+	XMLElement* LastFile = Document.NewElement("LastFile");
+	Settings->InsertEndChild(LastFile);
+	LastFile->SetAttribute("Name", ws2s(LastFileName).c_str());
+
+	SafeSaveDocumentToFile(Document, SettingsFileName, 0);
+}
+
+void SerializationManager::LoadState(SingleSerializedState& State, XMLDocument& Document, XMLNode* Root)
 {
 	State.HaveCharState = false;
 	State.HaveInputState = false;
@@ -255,7 +440,7 @@ void SerializationManager::LoadState(CompleteSerializedState& State, XMLDocument
 		State.HaveRenderState = true;
 }
 
-void SerializationManager::SaveState(CompleteSerializedState& State, XMLDocument& Document, XMLNode* Root)
+void SerializationManager::SaveState(SingleSerializedState& State, XMLDocument& Document, XMLNode* Root)
 {
 	XMLElement* PendingState = Document.NewElement("Pending");
 	PendingState->SetAttribute("ID", (uint32)State.PendingID);
@@ -271,7 +456,7 @@ void SerializationManager::SaveState(CompleteSerializedState& State, XMLDocument
 		State.RenderState.SaveToXML(Document, Root);
 }
 
-void SerializationManager::LoadStates(CompleteSerializedStates& States, XMLDocument& Document, XMLNode* Root)
+void SerializationManager::LoadStates(SerializedStateHistory& States, XMLDocument& Document, XMLNode* Root)
 {
 	XMLElement* CurrentStateElement = Root->FirstChildElement("CurrentState");
 	if (CurrentStateElement != nullptr) {
@@ -281,28 +466,35 @@ void SerializationManager::LoadStates(CompleteSerializedStates& States, XMLDocum
 		States.PreviousStates.clear();
 		for (auto PreviousStateElement : selection(Root->ToElement(), "PreviousState")) {
 
-			CompleteSerializedState PreviousState;
+			SingleSerializedState PreviousState;
 
 			LoadState(PreviousState, Document, PreviousStateElement);
 
 			States.PreviousStates.push_back(PreviousState);
 		}
 
+		LimitFrames(States.PreviousStates, MaxFrames);
+
 		States.FutureStates.clear();
 		for (auto FutureStateElement : selection(Root->ToElement(), "FutureState")) {
 
-			CompleteSerializedState FutureState;
+			SingleSerializedState FutureState;
 
 			LoadState(FutureState, Document, FutureStateElement);
 
 			States.FutureStates.push_back(FutureState);
 		}
+		LimitFrames(States.FutureStates, MaxFrames);
 	}
+	else
+		States = { };
+
+	States.ID = NextStateHistoryID++;
 }
 
-void SerializationManager::SaveStates(CompleteSerializedStates& States, XMLDocument& Document, XMLNode* Root)
+void SerializationManager::SaveStates(SerializedStateHistory& States, XMLDocument& Document, XMLNode* Root)
 {
-	for (CompleteSerializedState State : States.PreviousStates) {
+	for (SingleSerializedState State : States.PreviousStates) {
 
 		XMLNode* PreviousState = Document.NewElement("PreviousState");
 		Root->InsertEndChild(PreviousState);
@@ -315,7 +507,7 @@ void SerializationManager::SaveStates(CompleteSerializedStates& States, XMLDocum
 
 	SaveState(States.CurrentState, Document, CurrentState);
 
-	for (CompleteSerializedState State : States.FutureStates) {
+	for (SingleSerializedState State : States.FutureStates) {
 
 		XMLNode* FutureState = Document.NewElement("FutureState");
 		Root->InsertEndChild(FutureState);

@@ -73,12 +73,12 @@ void Character::GenerateBones(void)
 		{ 1, 0, 0 }, L"Pelvis");
 
 	Bone* Stomach = GenerateBone(Pelvis, { 0, 0, 1.0f }, { 6.5f, 13.0f, 17.6f }, { 0, 0, 1 }, 
-		{    0,  -70,  -10 }, 
-		{    0,    5,   10 },
+		{  -10,  -70,  -10 }, 
+		{   10,    5,   10 },
 		{ 1, 0, 0 }, L"Stomach");
 	Bone* Chest = GenerateBone(Stomach, { 0, 0, 1.0f }, { 6.5f, 13.0f, 17.6f }, { 0, 0, 1 }, 
-		{    0,  -70,  -10 }, 
-		{    0,   10,   10 }, 
+		{  -10,  -70,  -10 },
+		{   10,   10,   10 },
 		{ 1, 0, 0 }, L"Chest");
 
 	Bone* Neck = GenerateBone(Chest, { 0, 0, 1, }, { 3.0f, 3.0f, 15.0f }, { 0, 0, 1 }, 
@@ -105,7 +105,7 @@ void Character::GenerateBones(void)
 
 	GenerateRightSide(UpperLeg, UpperLeg->Parent, { 0, 1, 0 });
 
-	Bone* UpperArm = GenerateBone(Chest, { 0, 1, 0, }, { 4.5f, 32.0f, 4.5f }, { 0, 0.5f, 1 },
+	Bone* UpperArm = GenerateBone(Chest, { 0, 1, 0, }, { 4.5f, 32.0f, 4.5f }, { 0, 0.85f, 1 },
 		{  -65,  -80,  -45 }, 
 		{  110,   80,  110 }, 
 		{ 1, 0, 0 }, L"Upper Arm");
@@ -145,6 +145,16 @@ void Character::UpdateFloorZ(void)
 
 		FloorZ = min(FloorZ, Z);
 	}
+}
+
+void Character::Reset(void)
+{
+	Position = vec3(0.0f);
+
+	for (Bone* Bone : Bones)
+		Bone->Rotation = mat4(1.0f);
+
+	UpdateWorldTranforms();
 }
 
 void Character::CalculateJointLocations(void)

@@ -48,6 +48,7 @@ HWND Form::Initialize(HINSTANCE hInstance) {
 	aegSetCheckBoxCallback(CheckBoxStaticCallback);
 	aegSetEditCallback(EditStaticCallback);
 	aegSetTrackBarCallback(TrackBarStaticCallback);
+	aegSetTimelineCallback(TimelineStaticCallback);
 
 	UpdateBlocking();
 	UpdatePositionAndAngles();
@@ -147,10 +148,13 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 		InputManager::GetInstance().ProcessMouseWheelEvent((float)WheelDelta / WHEEL_DELTA);
 		break;
 	}
-	case WM_DESTROY:
+	case WM_DESTROY: {
+
+		SerializationManager::GetInstance().Autosave();
 
 		PostQuitMessage(0);
 		break;
+	}
 
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
@@ -220,9 +224,19 @@ void Form::EditStaticCallback(const wchar_t* Name, const wchar_t* Text)
 
 void Form::EditCallback(const wstring Name, const wstring Text)
 {
-	float Value = stof(Text, nullptr);
+	float Value;
 
-	if (Name == X_ANGLE_INPUT || Name == Y_ANGLE_INPUT || Name == Z_ANGLE_INPUT) {
+	try {
+		Value = stof(Text, nullptr);
+	}
+	catch (invalid_argument) {
+		Value = nanf("");
+	}
+	catch (out_of_range) {
+		Value = nanf("");
+	}
+
+	if (!isnan(Value) && (Name == X_ANGLE_INPUT || Name == Y_ANGLE_INPUT || Name == Z_ANGLE_INPUT)) {
 
 		float Angle = radians(Value);
 
@@ -246,7 +260,7 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 		InputManager::GetInstance().ChangeBoneAngles(Bone, Angles);
 	}
 
-	if (Name == X_POS_INPUT || Name == Y_POS_INPUT || Name == Z_POS_INPUT) {
+	if (!isnan(Value) && (Name == X_POS_INPUT || Name == Y_POS_INPUT || Name == Z_POS_INPUT)) {
 
 		float Position = Value / 100.0f; // to meters
 
@@ -270,6 +284,16 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 			BonePosition.z = Position;
 
 		InputManager::GetInstance().SetupInverseKinematic(Bone, inverse(Bone->MiddleTranslation) * vec4(LocalPoint, 1), BonePosition, true);
+	}
+
+	if (Name == OPEN_DIALOG)
+		SerializationManager::GetInstance().LoadFromFile(Text);
+	else
+	if (Name == NEW_DIALOG) {
+
+		SerializationManager::GetInstance().CreateNewHistories();
+
+		SerializationManager::GetInstance().SaveToFile(Text);
 	}
 }
 
@@ -304,6 +328,21 @@ void Form::TrackBarCallback(const wstring Name, float t)
 
 		InputManager::GetInstance().ChangeBoneAngles(Bone, Angles);
 	}
+}
+
+void Form::TimelineStaticCallback(float Position, int32 SelectedID, TimelineItem* Items, int32 ItemsCount)
+{
+	vector<TimelineItem> ItemsVector;
+	for (int Index = 0; Index < ItemsCount; Index++)
+		ItemsVector.push_back(Items[Index]);
+
+	Form::GetInstance().TimelineCallback(Position, SelectedID, ItemsVector);
+}
+
+void Form::TimelineCallback(float Position, int32 SelectedID, vector<TimelineItem> Items)
+{
+	SerializationManager::GetInstance().SetTimelineItems(Items);
+	AnimationManager::GetInstance().SetAnimationState(Position, SelectedID);
 }
 
 void Form::UpdateBlocking(void)
@@ -477,10 +516,21 @@ void Form::UpdatePositionAndAngles(void)
 	}
 }
 
+void Form::UpdateTimeline(void)
+{
+	float Position = AnimationManager::GetInstance().GetAnimationPosition();
+	int32 SelectedID = AnimationManager::GetInstance().IsInKinematicMode() ? 0 : SerializationManager::GetInstance().GetCurrentHistoryID();
+
+	vector<TimelineItem> Items = SerializationManager::GetInstance().GetTimelineItems();
+
+	aegSetTimelineState(Position, SelectedID, Items.data(), Items.size());
+}
+
 void Form::FullUpdate(void)
 {
 	UpdateBlocking();
 	UpdatePositionAndAngles();
+	UpdateTimeline();
 }
 
 void Form::ProcessPendingUpdates(void)
