@@ -11,6 +11,13 @@ Character* CharacterManager::GetCharacter(void) {
 	return Char;
 }
 
+void CharacterManager::Reset(void)
+{
+	AnimationTimestamp = 0;
+
+	GetCharacter()->Reset();
+}
+
 void CharacterManager::Serialize(CharacterSerializedState& State)
 {
 	Character* Char = GetCharacter();
@@ -33,7 +40,7 @@ void CharacterManager::Deserialize(CharacterSerializedState& State)
 
 	Char->Position = State.Position;
 
-	for (SerializedBone SerializedBone : State.Bones) {
+	for (SerializedBone& SerializedBone : State.Bones) {
 
 		Bone* Bone = Char->FindBone(SerializedBone.Name);
 		if (Bone == nullptr)

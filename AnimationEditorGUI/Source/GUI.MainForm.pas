@@ -36,6 +36,10 @@ type
     OpenDialog: TOpenTextFileDialog;
     NewDialog: TSaveTextFileDialog;
     TimelinePlaceholder: TPanel;
+    CreateState: TButton;
+    DeleteState: TButton;
+    MirrorState: TButton;
+    UndoDelete: TButton;
     procedure ApplicationEventsMessage(var Msg: tagMSG; var Handled: Boolean);
     procedure FormCreate(Sender: TObject);
     procedure ButtonClick(Sender: TObject);

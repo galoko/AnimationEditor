@@ -74,7 +74,8 @@ typedef struct RenderSerializedState {
 typedef enum SerializationPendingID {
 	PendingNone,
 	PendingAnglesTrackBar,
-	PendingInverseKinematic
+	PendingInverseKinematic,
+	PendingAnimationState
 } SerializationPendingID;
 
 typedef struct SingleSerializedState {
@@ -90,6 +91,8 @@ typedef struct SingleSerializedState {
 
 typedef struct SerializedStateHistory {
 	int32 ID;
+	bool IsDeleted;
+
 	vector<SingleSerializedState> PreviousStates, FutureStates;
 	SingleSerializedState CurrentState;
 } SerializedStateHistory;
@@ -106,7 +109,7 @@ private:
 	wstring LastFileName;
 	ULONGLONG LastAutosaveTime;
 
-	const wstring SettingsFileName = L"Settings.xml";
+	wstring SettingsFileName;
 
 	SerializationManager(void) { };
 
@@ -147,18 +150,23 @@ public:
 	SerializationManager(SerializationManager const&) = delete;
 	void operator=(SerializationManager const&) = delete;
 
-	void Initialize(void);
+	void Initialize(const wstring WorkingDirectory);
 
-	void CreateNewHistories(void);
-
-	void LoadFromFile(const wstring FileName);
+	void LoadFromFile(wstring FileName);
 	void SaveToFile(const wstring FileName);
 
 	void Autosave(void);
 
 	void Tick(double dt);
 
+	void CreateNewFile(void);
+	void CreateNewHistory(void);
+	int32 CreateCopyOfCurrentState(void);
 	bool LoadHistoryByID(int32 ID);
+	uint32 GetDeletedHistoryCount(void);
+	void DeleteHistory(int32 ID);
+	void UndoLastHistoryDeletion(void);
+	void ReloadCurrentHistory(void);
 	int32 GetCurrentHistoryID(void);
 
 	const int PendingTimeout = 250;

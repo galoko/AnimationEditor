@@ -246,6 +246,14 @@ void InputManager::SetupInverseKinematic(Bone* Bone, vec3 LocalPoint, vec3 DestW
 	SetState(IsAutomatic ? InverseKinematicAutomate: InverseKinematic);
 }
 
+void InputManager::UpdateAnimationKinematicMode(void)
+{
+	bool ShouldBeKinematic = AnimationManager::GetInstance().IsInKinematicMode();
+	bool IsKinematic = State == AnimationKinematic;
+	if (ShouldBeKinematic != IsKinematic) 
+		SetState(ShouldBeKinematic ? AnimationKinematic : None);
+}
+
 void InputManager::SetWorldPointToScreePoint(LONG x, LONG y) {
 
 	vec3 Point, Direction;

@@ -2,6 +2,7 @@
 
 #include <locale>
 #include <codecvt>
+#include <algorithm>
 
 #include <tixml2ex.h>
 
@@ -9,32 +10,15 @@
 #include "InputManager.hpp"
 #include "AnimationManager.hpp"
 #include "Render.hpp"
+#include "Form.hpp"
 
-void SerializationManager::Initialize(void)
+void SerializationManager::Initialize(const wstring WorkingDirectory)
 {
+	SettingsFileName = WorkingDirectory + L"\\Settings.xml";
+
 	NextStateHistoryID = 1;
 
 	LoadSettings();
-}
-
-void SerializationManager::CreateNewHistories(void)
-{
-	Histories.clear();
-
-	CharacterManager::GetInstance().GetCharacter()->Reset();
-
-	SerializedStateHistory History = {};
-
-	History.ID = NextStateHistoryID++;
-
-	CharacterManager::GetInstance().Serialize(History.CurrentState.CharState);
-	History.CurrentState.HaveCharState = true;
-	History.CurrentState.HaveInputState = true;
-	History.CurrentState.HaveAnimationState = true;
-
-	Histories.push_back(History);
-
-	Deserialize();
 }
 
 void SerializationManager::Serialize(void)
@@ -75,16 +59,15 @@ void SerializationManager::Deserialize(void)
 
 void SerializationManager::Autosave(void)
 {
-	SaveToFile(LastFileName);
+	if (IsFileOpen())
+		SaveToFile(LastFileName);
 }
 
 void SerializationManager::Tick(double dt)
 {
-	if (IsFileOpen()) {
-		ULONGLONG Now = GetTickCount64();
-		if (LastAutosaveTime + AutosaveInterval < Now)
-			Autosave();
-	}
+	ULONGLONG Now = GetTickCount64();
+	if (LastAutosaveTime + AutosaveInterval < Now)
+		Autosave();
 }
 
 void SerializationManager::InternalPushStateFrame(bool Forward)
@@ -115,6 +98,49 @@ void SerializationManager::LimitFrames(vector<SingleSerializedState>& Frames, in
 	}
 }
 
+void SerializationManager::CreateNewFile(void)
+{
+	Histories.clear();
+
+	CreateNewHistory();
+
+	Deserialize();
+}
+
+void SerializationManager::CreateNewHistory(void)
+{
+	SerializedStateHistory History = {};
+
+	History.ID = NextStateHistoryID++;
+
+	CharacterManager::GetInstance().Serialize(History.CurrentState.CharState);
+	History.CurrentState.HaveCharState = true;
+	History.CurrentState.HaveInputState = true;
+	History.CurrentState.HaveAnimationState = true;
+	History.CurrentState.HaveRenderState = false;
+
+	Histories.push_back(History);
+}
+
+int32 SerializationManager::CreateCopyOfCurrentState(void)
+{
+	GetCurrentHistory()->CurrentState.HaveCharState = true;
+	GetCurrentHistory()->CurrentState.HaveInputState = true;
+	GetCurrentHistory()->CurrentState.HaveAnimationState = true;
+	GetCurrentHistory()->CurrentState.HaveRenderState = false;
+	Serialize();
+
+	SerializedStateHistory Copy = *GetCurrentHistory();
+
+	Copy.ID = NextStateHistoryID++;
+
+	Histories.push_back(Copy);
+
+	Form::GetInstance().UpdateTimeline();
+
+	return GetCurrentHistoryID();
+}
+
 bool SerializationManager::LoadHistoryByID(int32 ID)
 {
 	auto CurrentHistory = GetCurrentHistory();
@@ -128,10 +154,75 @@ bool SerializationManager::LoadHistoryByID(int32 ID)
 
 	iter_swap(CurrentHistory, NextHistory);
 
-	GetCurrentHistory()->CurrentState.HaveRenderState = false;
-	Deserialize();
+	ReloadCurrentHistory();
 
 	return true;
+}
+
+uint32 SerializationManager::GetDeletedHistoryCount(void)
+{
+	uint32 Result = 0;
+
+	for (SerializedStateHistory& History : Histories)
+		if (History.IsDeleted)
+			Result++;
+		else
+			break;
+
+	return Result;
+}
+
+void SerializationManager::DeleteHistory(int32 ID)
+{
+	auto History = GetHistoryByID(ID);
+	if (History != Histories.end()) {
+
+		bool ShouldReloadCurrentHistory = History->ID == GetCurrentHistoryID();
+
+		History->IsDeleted = true;
+
+		if (GetDeletedHistoryCount() <= 100)
+			rotate(Histories.begin(), History, History + 1);
+		else
+			Histories.erase(History);
+	
+		if (GetCurrentHistory()->IsDeleted) {
+
+			CharacterManager::GetInstance().Reset();
+			CreateNewHistory();
+
+			ShouldReloadCurrentHistory = true;
+		}
+
+		if (ShouldReloadCurrentHistory) 
+			ReloadCurrentHistory();
+
+		Form::GetInstance().UpdateTimeline();
+	}
+}
+
+void SerializationManager::UndoLastHistoryDeletion(void)
+{
+	if (!Histories.empty()) {
+
+		auto LastDeletedHistory = Histories.begin();
+		if (!LastDeletedHistory->IsDeleted)
+			return;
+
+		LastDeletedHistory->IsDeleted = false;
+
+		rotate(LastDeletedHistory, LastDeletedHistory + 1, Histories.end());
+
+		ReloadCurrentHistory();
+
+		Form::GetInstance().UpdateTimeline();
+	}
+}
+
+void SerializationManager::ReloadCurrentHistory(void)
+{
+	GetCurrentHistory()->CurrentState.HaveRenderState = false;
+	Deserialize();
 }
 
 int32 SerializationManager::GetCurrentHistoryID(void)
@@ -222,10 +313,11 @@ vector<TimelineItem> SerializationManager::GetTimelineItems(void)
 {
 	vector<TimelineItem> Result;
 
-	for (SerializedStateHistory& History : Histories) {
-		TimelineItem Item = { History.ID, History.CurrentState.CharState.AnimationTimestamp / 1000.0f };
-		Result.push_back(Item);
-	}
+	for (SerializedStateHistory& History : Histories) 
+		if (!History.IsDeleted) {
+			TimelineItem Item = { History.ID, History.CurrentState.CharState.AnimationTimestamp / 1000.0f };
+			Result.push_back(Item);
+		}
 
 	return Result;
 }
@@ -298,45 +390,70 @@ uint32 attribute_uint32_value(XMLElement* Element, const char* AttributeName) {
 	return Result;
 }
 
-void SerializationManager::LoadFromFile(const wstring FileName)
+void SerializationManager::LoadFromFile(wstring FileName)
 {
-	FILE* File = _wfopen(FileName.c_str(), L"rb");
-	if (File == nullptr)
-		return;
-
-	XMLDocument Document;
-	Document.LoadFile(File);
-	fclose(File);
-
-	float Position = 0.0f;
-	bool KinematicModeFlag = false;
-
 	Histories.clear();
 
-	XMLNode* Root = Document.FirstChildElement("Root");
-	if (Root != nullptr) {		
+	FILE* File = _wfopen(FileName.c_str(), L"rb");
+	if (File != nullptr) {
 
-		for (auto StatesElement : selection(Root->ToElement(), "States")) {
+		XMLDocument Document;
+		Document.LoadFile(File);
+		fclose(File);
 
-			SerializedStateHistory States;
+		float Position = 0.0f;
+		bool KinematicModeFlag = false;
 
-			LoadStates(States, Document, StatesElement);
+		XMLNode* Root = Document.FirstChildElement("Root");
+		if (Root != nullptr) {
 
-			Histories.push_back(States);
+			for (auto StatesElement : selection(Root->ToElement(), "States")) {
+
+				SerializedStateHistory States;
+
+				LoadStates(States, Document, StatesElement);
+
+				Histories.push_back(States);
+			}
+
+			struct {
+				bool operator()(SerializedStateHistory& a, SerializedStateHistory& b) const
+				{
+					if (a.IsDeleted && !b.IsDeleted)
+						return true;
+
+					if (!a.IsDeleted && b.IsDeleted)
+						return false;
+
+					return a.ID < b.ID;
+				}
+			} HistoryComparer;
+
+			sort(Histories.begin(), Histories.end(), HistoryComparer);
+
+			if (!Histories.empty()) 
+				Deserialize();
+
+			XMLElement* AnimationElement = Root->FirstChildElement("Animation");
+			if (AnimationElement != nullptr) {
+
+				Position = attribute_float_value(AnimationElement, "Position");
+				KinematicModeFlag = attribute_bool_value(AnimationElement, "KinematicMode", false);
+			}
 		}
 
-		if (!Histories.empty())
-			Deserialize();
+		AnimationManager::GetInstance().SetAnimationState(Position, KinematicModeFlag ? 0 : GetCurrentHistoryID());
 
-		XMLElement* AnimationElement = Root->FirstChildElement("Animation");
-		if (AnimationElement != nullptr) {
-
-			Position = attribute_float_value(AnimationElement, "Position");
-			KinematicModeFlag = attribute_bool_value(AnimationElement, "KinematicMode", false);
-		}
+		LastAutosaveTime = GetTickCount64();
 	}
 
-	AnimationManager::GetInstance().SetAnimationState(Position, KinematicModeFlag ? 0 : GetCurrentHistoryID());
+	if (Histories.empty()) {
+
+		CharacterManager::GetInstance().Reset();
+		CreateNewFile();
+
+		FileName = L"";
+	}
 
 	if (LastFileName != FileName) {
 
@@ -344,8 +461,6 @@ void SerializationManager::LoadFromFile(const wstring FileName)
 
 		SaveSettings();
 	}
-
-	LastAutosaveTime = GetTickCount64();
 }
 
 void SerializationManager::SaveToFile(const wstring FileName)
@@ -362,7 +477,7 @@ void SerializationManager::SaveToFile(const wstring FileName)
 	XMLNode* Root = Document.NewElement("Root");
 	Document.InsertFirstChild(Root);
 
-	for (SerializedStateHistory States : Histories) {
+	for (SerializedStateHistory& States : Histories) {
 
 		XMLElement* StatesElement = Document.NewElement("States");
 		Root->InsertEndChild(StatesElement);
@@ -398,7 +513,7 @@ void SerializationManager::LoadSettings(void)
 			LastFileName = s2ws(attribute_value(LastFile, "Name"));
 	}
 
-	if (IsFileOpen())
+	if (LastFileName != L"")
 		LoadFromFile(LastFileName);
 }
 
@@ -489,12 +604,16 @@ void SerializationManager::LoadStates(SerializedStateHistory& States, XMLDocumen
 	else
 		States = { };
 
+	States.IsDeleted = attribute_bool_value(Root->ToElement(), "IsDeleted", false);
+
 	States.ID = NextStateHistoryID++;
 }
 
 void SerializationManager::SaveStates(SerializedStateHistory& States, XMLDocument& Document, XMLNode* Root)
 {
-	for (SingleSerializedState State : States.PreviousStates) {
+	Root->ToElement()->SetAttribute("IsDeleted", States.IsDeleted);
+
+	for (SingleSerializedState& State : States.PreviousStates) {
 
 		XMLNode* PreviousState = Document.NewElement("PreviousState");
 		Root->InsertEndChild(PreviousState);
@@ -507,7 +626,7 @@ void SerializationManager::SaveStates(SerializedStateHistory& States, XMLDocumen
 
 	SaveState(States.CurrentState, Document, CurrentState);
 
-	for (SingleSerializedState State : States.FutureStates) {
+	for (SingleSerializedState& State : States.FutureStates) {
 
 		XMLNode* FutureState = Document.NewElement("FutureState");
 		Root->InsertEndChild(FutureState);
@@ -532,7 +651,7 @@ void CharacterSerializedState::SaveToXML(XMLDocument& Document, XMLNode *Root)
 	Position->SetAttribute("Z", this->Position.z);
 	CharState->InsertEndChild(Position);
 
-	for (SerializedBone Bone : Bones) {
+	for (SerializedBone& Bone : Bones) {
 
 		XMLElement* BoneElement = Document.NewElement("Bone");
 		BoneElement->SetAttribute("Name", ws2s(Bone.Name).c_str());
@@ -664,7 +783,7 @@ void AnimationSerializedState::SaveToXML(XMLDocument& Document, XMLNode* Root)
 {
 	XMLNode* AnimationState = Document.NewElement("AnimationState");
 
-	for (SerializedAnimationContext Context : Contexts) {
+	for (SerializedAnimationContext& Context : Contexts) {
 
 		XMLElement* ContextElement = Document.NewElement("Context");
 		ContextElement->SetAttribute("Name", ws2s(Context.BoneName).c_str());

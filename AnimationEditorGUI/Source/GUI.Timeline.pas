@@ -52,7 +52,7 @@ type
     function XToPosition(X: Integer) : Single;
 
     function GetIndexByX(X: Integer) : Integer;
-    procedure SetActivePositionFromX(X: Integer);
+    procedure SetActivePositionFromX(X: Integer; const Sender: String);
     function IsSelected(const Item: TTimelineItem) : Boolean;
     function FindNewIndex(const OldItems: TArray<TTimelineItem>; OldIndex: Integer) : Integer;
     function FindIndexByID(ID: Integer) : Integer;
@@ -113,18 +113,28 @@ end;
 procedure TTimeline.SceneMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
+  if X = LastMouseX then
+    Exit;
+
   ActiveIndex:= GetIndexByX(X);
 
   if ActiveIndex < 0 then
-    SetActivePositionFromX(X);
+    SetActivePositionFromX(X, 'Down');
 
   LastMouseX:= X;
 end;
 
 procedure TTimeline.SceneMouseMove(Sender: TObject; Shift: TShiftState; X,
   Y: Integer);
+var
+  Point: TPoint;
 begin
-  SetActivePositionFromX(X);
+  if X = LastMouseX then
+    Exit;
+
+  Point:= TPoint.Create(X, Y);
+
+  SetActivePositionFromX(X, 'Move');
 
   LastMouseX:= X;
 end;
@@ -132,8 +142,11 @@ end;
 procedure TTimeline.SceneMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
+  if X = LastMouseX then
+    Exit;
+
   if ActiveIndex < 0 then
-    SetActivePositionFromX(X);
+    SetActivePositionFromX(X, 'Up');
 
   ActiveIndex:= INDEX_NONE;
 
@@ -256,7 +269,7 @@ begin
   Result:= NewActiveIndex;
 end;
 
-procedure TTimeline.SetActivePositionFromX(X: Integer);
+procedure TTimeline.SetActivePositionFromX(X: Integer; const Sender: String);
 var
   ActivePosition: PSingle;
 begin

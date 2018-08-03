@@ -171,11 +171,35 @@ void Form::ButtonCallback(const wstring Name)
 {
 	if (Name == RESET_ROOT_POSITION) {
 
+		SerializationManager::GetInstance().PushStateFrame(L"Root reset");
+
 		Character* Char = CharacterManager::GetInstance().GetCharacter();
 
 		Char->Position = vec3(0.0f);
 		Char->UpdateWorldTranforms();
 		PhysicsManager::GetInstance().SyncWorldWithCharacter();
+	}
+	else
+	if (Name == CREATE_STATE) {
+
+		int32 HistoryID = SerializationManager::GetInstance().CreateCopyOfCurrentState();
+		if (HistoryID > 0)
+			SerializationManager::GetInstance().LoadHistoryByID(HistoryID);
+	}
+	else
+	if (Name == DELETE_STATE) {
+
+		int32 HistoryID = SerializationManager::GetInstance().GetCurrentHistoryID();
+		SerializationManager::GetInstance().DeleteHistory(HistoryID);
+	}
+	if (Name == UNDO_DELETE) 
+		SerializationManager::GetInstance().UndoLastHistoryDeletion();
+	else
+	if (Name == MIRROR_STATE) {
+
+		SerializationManager::GetInstance().PushStateFrame(L"Mirror");
+
+		CharacterManager::GetInstance().GetCharacter()->Mirror();
 	}
 }
 
@@ -186,35 +210,38 @@ void Form::CheckBoxStaticCallback(const wchar_t* Name, bool IsChecked)
 
 void Form::CheckBoxCallback(const wstring Name, bool IsChecked)
 {
-	InputSelection Selection = InputManager::GetInstance().GetSelection();
-	if (!Selection.HaveBone())
-		return;
+	if (Name == X_POS || Name == Y_POS || Name == Z_POS || Name == X_AXIS || Name == Y_AXIS || Name == Z_AXIS) {
 
-	SerializationManager::GetInstance().PushStateFrame(L"CheckBoxCallback");
+		InputSelection Selection = InputManager::GetInstance().GetSelection();
+		if (!Selection.HaveBone())
+			return;
 
-	Bone* Bone = Selection.Bone;
-	BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Bone);
+		SerializationManager::GetInstance().PushStateFrame(L"Set Blocking (" + Name + L")");
 
-	if (Name == X_POS)
-		Blocking.XPos = IsChecked;
-	else
-	if (Name == Y_POS)
-		Blocking.YPos = IsChecked;
-	else
-	if (Name == Z_POS)
-		Blocking.ZPos = IsChecked;
-	else
-	if (Name == X_AXIS)
-		Blocking.XAxis = IsChecked;
-	else
-	if (Name == Y_AXIS)
-		Blocking.YAxis = IsChecked;
-	else
-	if (Name == Z_AXIS)
-		Blocking.ZAxis = IsChecked;
+		Bone* Bone = Selection.Bone;
+		BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Bone);
 
-	if (Bone != nullptr)
-		AnimationManager::GetInstance().SetBoneBlocking(Bone, Blocking);
+		if (Name == X_POS)
+			Blocking.XPos = IsChecked;
+		else
+		if (Name == Y_POS)
+			Blocking.YPos = IsChecked;
+		else
+		if (Name == Z_POS)
+			Blocking.ZPos = IsChecked;
+		else
+		if (Name == X_AXIS)
+			Blocking.XAxis = IsChecked;
+		else
+		if (Name == Y_AXIS)
+			Blocking.YAxis = IsChecked;
+		else
+		if (Name == Z_AXIS)
+			Blocking.ZAxis = IsChecked;
+
+		if (Bone != nullptr)
+			AnimationManager::GetInstance().SetBoneBlocking(Bone, Blocking);
+	}
 }
 
 void Form::EditStaticCallback(const wchar_t* Name, const wchar_t* Text)
@@ -244,7 +271,7 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 		if (Bone == nullptr)
 			return;
 
-		SerializationManager::GetInstance().PushStateFrame(L"EditCallback Angles");
+		SerializationManager::GetInstance().PushStateFrame(L"Set Angle (" + Name + L")");
 
 		vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Bone);
 
@@ -268,7 +295,7 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 		if (Bone == nullptr)
 			return;
 
-		SerializationManager::GetInstance().PushStateFrame(L"EditCallback Position");
+		SerializationManager::GetInstance().PushStateFrame(L"Set Position (" + Name + L")");
 
 		vec3 LocalPoint = Bone->Tail * Bone->Size;
 
@@ -291,7 +318,7 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 	else
 	if (Name == NEW_DIALOG) {
 
-		SerializationManager::GetInstance().CreateNewHistories();
+		SerializationManager::GetInstance().CreateNewFile();
 
 		SerializationManager::GetInstance().SaveToFile(Text);
 	}
@@ -518,12 +545,14 @@ void Form::UpdatePositionAndAngles(void)
 
 void Form::UpdateTimeline(void)
 {
+	CheckFormUpdateBlock(IsTimelineUpdatePending);
+
 	float Position = AnimationManager::GetInstance().GetAnimationPosition();
 	int32 SelectedID = AnimationManager::GetInstance().IsInKinematicMode() ? 0 : SerializationManager::GetInstance().GetCurrentHistoryID();
 
 	vector<TimelineItem> Items = SerializationManager::GetInstance().GetTimelineItems();
 
-	aegSetTimelineState(Position, SelectedID, Items.data(), Items.size());
+	aegSetTimelineState(Position, SelectedID, Items.data(), (uint32)Items.size());
 }
 
 void Form::FullUpdate(void)
@@ -542,5 +571,9 @@ void Form::ProcessPendingUpdates(void)
 	if (IsPositionsAndAnglesUpdatePending) {
 		IsPositionsAndAnglesUpdatePending = false;
 		UpdatePositionAndAngles();
+	}
+	if (IsTimelineUpdatePending) {
+		IsTimelineUpdatePending = false;
+		UpdateTimeline();
 	}
 }

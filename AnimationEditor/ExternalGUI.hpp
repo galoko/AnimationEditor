@@ -28,6 +28,10 @@ void UnloadExternalGUI(void);
 #define Z_AXIS_BAR          L"ZAxisBar"
 #define OPEN_DIALOG         L"OpenDialog"
 #define NEW_DIALOG          L"NewDialog"
+#define CREATE_STATE        L"CreateState"
+#define DELETE_STATE        L"DeleteState"
+#define UNDO_DELETE         L"UndoDelete"
+#define MIRROR_STATE        L"MirrorState"
 
 typedef struct TimelineItem {
 	int32 ID;

@@ -27,7 +27,7 @@ private:
 	// Update
 
 	int32 UpdateBlockCounter;
-	bool IsBlockingUpdatePending, IsPositionsAndAnglesUpdatePending;
+	bool IsBlockingUpdatePending, IsPositionsAndAnglesUpdatePending, IsTimelineUpdatePending;
 
 	void ProcessPendingUpdates(void);
 

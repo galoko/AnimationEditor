@@ -74,6 +74,7 @@ public:
 	void UpdateFloorZ(void);
 
 	void Reset(void);
+	void Mirror(void);
 
 	Bone* FindBone(const wstring Name);
 } Character;

@@ -3,6 +3,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "CharacterManager.hpp"
+#include "InputManager.hpp"
 #include "Form.hpp"
 
 using namespace psm;
@@ -122,9 +123,15 @@ bool AnimationManager::IsInKinematicMode(void)
 
 void AnimationManager::SetAnimationState(float Position, int32 SelectedID)
 {
+	SerializationManager::GetInstance().PushPendingStateFrame(PendingAnimationState, L"Animation State change");
+
+	Form::UpdateLock Lock;
+
 	AnimationPosition = Position;
 
 	KinematicModeFlag = (SelectedID <= 0) || !SerializationManager::GetInstance().LoadHistoryByID(SelectedID);
+
+	InputManager::GetInstance().UpdateAnimationKinematicMode();
 
 	Form::GetInstance().UpdateTimeline();
 }
@@ -162,11 +169,21 @@ void AnimationManager::Deserialize(AnimationSerializedState& State)
 
 	Character* Char = CharacterManager::GetInstance().GetCharacter();
 
-	for (SerializedAnimationContext SerializedContext : State.Contexts) {
+	for (Bone* Bone : Char->Bones) {
 
-		Bone* Bone = Char->FindBone(SerializedContext.BoneName);
-		if (Bone == nullptr)
-			continue;
+		SerializedAnimationContext SerializedContext = {};
+		SerializedContext.Blocking.XPos  = true;
+		SerializedContext.Blocking.YPos  = true;
+		SerializedContext.Blocking.ZPos  = true;
+		SerializedContext.Blocking.XAxis = true;
+		SerializedContext.Blocking.YAxis = true;
+		SerializedContext.Blocking.ZAxis = true;
+
+		for (SerializedAnimationContext& Context : State.Contexts)
+			if (Context.BoneName == Bone->Name) {
+				SerializedContext = Context;
+				break;
+			}
 
 		BlockingInfo Blocking;
 

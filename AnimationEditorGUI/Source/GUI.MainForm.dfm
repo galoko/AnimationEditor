@@ -29,15 +29,15 @@ object AnimationEditorForm: TAnimationEditorForm
     ParentCtl3D = False
     TabOrder = 0
     object ResetRootPosition: TButton
-      Left = 15
-      Top = 85
+      Left = 7
+      Top = 90
       Width = 105
       Height = 25
       Caption = 'Reset Root Position'
       TabOrder = 0
     end
     object XAxis: TCheckBox
-      Left = 296
+      Left = 352
       Top = 20
       Width = 50
       Height = 17
@@ -45,7 +45,7 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 4
     end
     object YAxis: TCheckBox
-      Left = 296
+      Left = 352
       Top = 43
       Width = 50
       Height = 17
@@ -53,7 +53,7 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 5
     end
     object ZAxis: TCheckBox
-      Left = 296
+      Left = 352
       Top = 66
       Width = 50
       Height = 17
@@ -61,7 +61,7 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 6
     end
     object XPos: TCheckBox
-      Left = 143
+      Left = 215
       Top = 20
       Width = 66
       Height = 17
@@ -69,7 +69,7 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 1
     end
     object YPos: TCheckBox
-      Left = 143
+      Left = 215
       Top = 43
       Width = 66
       Height = 17
@@ -77,7 +77,7 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 2
     end
     object ZPos: TCheckBox
-      Left = 143
+      Left = 215
       Top = 66
       Width = 66
       Height = 17
@@ -85,49 +85,49 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 3
     end
     object XPosInput: TEdit
-      Left = 215
+      Left = 287
       Top = 16
       Width = 49
       Height = 21
       TabOrder = 7
     end
     object YPosInput: TEdit
-      Left = 215
+      Left = 287
       Top = 43
       Width = 49
       Height = 21
       TabOrder = 8
     end
     object ZPosInput: TEdit
-      Left = 215
+      Left = 287
       Top = 70
       Width = 49
       Height = 21
       TabOrder = 9
     end
     object YAngleInput: TEdit
-      Left = 352
+      Left = 408
       Top = 43
       Width = 49
       Height = 21
       TabOrder = 10
     end
     object ZAngleInput: TEdit
-      Left = 352
+      Left = 408
       Top = 70
       Width = 49
       Height = 21
       TabOrder = 11
     end
     object XAngleInput: TEdit
-      Left = 352
+      Left = 408
       Top = 16
       Width = 49
       Height = 21
       TabOrder = 12
     end
     object XAxisBar: TTrackBar
-      Left = 407
+      Left = 463
       Top = 16
       Width = 75
       Height = 21
@@ -135,7 +135,7 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 13
     end
     object YAxisBar: TTrackBar
-      Left = 407
+      Left = 463
       Top = 43
       Width = 75
       Height = 21
@@ -143,7 +143,7 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 14
     end
     object ZAxisBar: TTrackBar
-      Left = 407
+      Left = 463
       Top = 70
       Width = 75
       Height = 21
@@ -151,8 +151,8 @@ object AnimationEditorForm: TAnimationEditorForm
       TabOrder = 15
     end
     object OpenFile: TButton
-      Left = 24
-      Top = 16
+      Left = 5
+      Top = 3
       Width = 75
       Height = 25
       Caption = 'Open File'
@@ -160,8 +160,8 @@ object AnimationEditorForm: TAnimationEditorForm
       OnClick = OpenFileClick
     end
     object NewFile: TButton
-      Left = 24
-      Top = 47
+      Left = 5
+      Top = 29
       Width = 75
       Height = 25
       Caption = 'New File'
@@ -169,14 +169,46 @@ object AnimationEditorForm: TAnimationEditorForm
       OnClick = NewFileClick
     end
     object TimelinePlaceholder: TPanel
-      Left = 496
+      Left = 544
       Top = 16
-      Width = 769
+      Width = 721
       Height = 89
       BevelOuter = bvNone
       Color = clHighlight
       ParentBackground = False
       TabOrder = 18
+    end
+    object CreateState: TButton
+      Left = 83
+      Top = 3
+      Width = 75
+      Height = 25
+      Caption = 'Create State'
+      TabOrder = 19
+    end
+    object DeleteState: TButton
+      Left = 83
+      Top = 29
+      Width = 75
+      Height = 25
+      Caption = 'Delete State'
+      TabOrder = 20
+    end
+    object MirrorState: TButton
+      Left = 118
+      Top = 90
+      Width = 75
+      Height = 25
+      Caption = 'Mirror State'
+      TabOrder = 21
+    end
+    object UndoDelete: TButton
+      Left = 83
+      Top = 55
+      Width = 75
+      Height = 25
+      Caption = 'Undo Delete'
+      TabOrder = 22
     end
   end
   object OpenGLPanel: TPanel

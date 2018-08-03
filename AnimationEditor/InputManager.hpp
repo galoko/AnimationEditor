@@ -14,7 +14,7 @@ typedef enum InputState {
 	None,
 	InverseKinematic,
 	InverseKinematicAutomate,
-	AnimationPlaying
+	AnimationKinematic
 } InputState;
 
 typedef struct InputSelection {
@@ -98,6 +98,8 @@ public:
 	vec3 GetPlaneNormal(void);
 	void ChangeBoneAngles(Bone* Bone, vec3 Angles);
 	void SetupInverseKinematic(Bone* Bone, vec3 LocalPoint, vec3 DestWorldPoint, bool IsAutomatic);
+
+	void UpdateAnimationKinematicMode(void);
 
 	void ProcessMouseInput(LONG dx, LONG dy);	
 	void ProcessMouseFormEvent(LONG x, LONG y);

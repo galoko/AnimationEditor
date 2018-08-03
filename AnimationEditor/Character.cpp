@@ -157,6 +157,11 @@ void Character::Reset(void)
 	UpdateWorldTranforms();
 }
 
+void Character::Mirror(void)
+{
+	// TODO
+}
+
 void Character::CalculateJointLocations(void)
 {
 	for (Bone* Child : Bones) {

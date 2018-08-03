@@ -27,6 +27,8 @@ public:
 
 	uint32 AnimationTimestamp;
 
+	void Reset(void);
+
 	void Serialize(CharacterSerializedState& State);
 	void Deserialize(CharacterSerializedState& State);
 
