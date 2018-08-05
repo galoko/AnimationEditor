@@ -8,7 +8,7 @@
 
 #include "CharacterManager.hpp"
 #include "InputManager.hpp"
-#include "AnimationManager.hpp"
+#include "PoseManager.hpp"
 #include "Render.hpp"
 #include "Form.hpp"
 

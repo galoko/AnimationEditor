@@ -14,7 +14,7 @@
 
 #include "PhysicsManager.hpp"
 #include "InputManager.hpp"
-#include "AnimationManager.hpp"
+#include "PoseManager.hpp"
 #include "CharacterManager.hpp"
 #include "SerializationManager.hpp"
 #include "shader.hpp"

@@ -9,7 +9,7 @@
 #include "Render.hpp"
 #include "InputManager.hpp"
 #include "PhysicsManager.hpp"
-#include "AnimationManager.hpp"
+#include "PoseManager.hpp"
 
 void OpenConsole(void) {
 

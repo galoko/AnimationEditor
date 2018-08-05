@@ -19,7 +19,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AnimationManager.cpp" />
     <ClCompile Include="Character.cpp" />
     <ClCompile Include="CharacterManager.cpp" />
     <ClCompile Include="ExternalGUI.cpp" />
@@ -27,19 +26,20 @@
     <ClCompile Include="InputManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PhysicsManager.cpp" />
+    <ClCompile Include="PoseManager.cpp" />
     <ClCompile Include="Render.cpp" />
     <ClCompile Include="SerializationManager.cpp" />
     <ClCompile Include="shader.cpp" />
     <ClCompile Include="texture.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AnimationManager.hpp" />
     <ClInclude Include="Character.hpp" />
     <ClInclude Include="CharacterManager.hpp" />
     <ClInclude Include="ExternalGUI.hpp" />
     <ClInclude Include="Form.hpp" />
     <ClInclude Include="InputManager.hpp" />
     <ClInclude Include="PhysicsManager.hpp" />
+    <ClInclude Include="PoseManager.hpp" />
     <ClInclude Include="Render.hpp" />
     <ClInclude Include="SerializationManager.hpp" />
     <ClInclude Include="shader.hpp" />

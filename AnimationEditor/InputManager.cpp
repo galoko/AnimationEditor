@@ -3,7 +3,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Render.hpp"
-#include "AnimationManager.hpp"
+#include "PoseManager.hpp"
 #include "CharacterManager.hpp"
 #include "Form.hpp"
 

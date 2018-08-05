@@ -7,7 +7,7 @@
 
 #include "Render.hpp"
 #include "InputManager.hpp"
-#include "AnimationManager.hpp"
+#include "PoseManager.hpp"
 #include "CharacterManager.hpp"
 #include "ExternalGUI.hpp"
 #include "shader.hpp"
