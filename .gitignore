@@ -261,6 +261,7 @@ __pycache__/
 *.pyc
 /AnimationEditor/AnimationEditorGUI.dll
 /AnimationEditor/Settings.xml
+/AnimationEditor/Settings.backup
 *.dcu
 *.identcache
 *.local
