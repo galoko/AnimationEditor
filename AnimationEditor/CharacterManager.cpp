@@ -29,7 +29,7 @@ void CharacterManager::Serialize(CharacterSerializedState& State)
 	State.Bones.clear();
 
 	for (Bone* Bone : Char->Bones) 
-		State.Bones.push_back({ Bone->Name, quat_cast(Bone->Rotation) });
+		State.Bones.push_back({ Bone->GetName(), quat_cast(Bone->Rotation) });
 }
 
 void CharacterManager::Deserialize(CharacterSerializedState& State)

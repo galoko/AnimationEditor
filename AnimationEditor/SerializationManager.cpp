@@ -23,6 +23,9 @@ void SerializationManager::Initialize(const wstring WorkingDirectory)
 
 void SerializationManager::Serialize(void)
 {
+	if (!HaveCurrentHistory())
+		return;
+
 	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
 
 	if (State.HaveCharState)
@@ -40,6 +43,9 @@ void SerializationManager::Serialize(void)
 
 void SerializationManager::Deserialize(void)
 {
+	if (!HaveCurrentHistory())
+		return;
+
 	PendingLastTime = GetTickCount64();
 
 	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
@@ -57,6 +63,32 @@ void SerializationManager::Deserialize(void)
 		AnimationManager::GetInstance().Deserialize(State.AnimationState);
 }
 
+void SerializationManager::Serialize(SerializeSerializedState& State)
+{
+	State.AnimationPosition = this->GetAnimationPosition();
+	State.AnimationLength = this->GetAnimationLength();
+	State.KinematicModeFlag = this->IsInKinematicMode();
+	State.PlayAnimaionFlag = this->IsAnimationPlaying();
+	State.LoopAnimationFlag = this->IsAnimationLooped();
+}
+
+void SerializationManager::Deserialize(SerializeSerializedState & State)
+{
+	Form::UpdateLock Lock;
+
+	SetAnimationPosition(State.AnimationPosition);
+	SetAnimationLength(State.AnimationLength);
+	SetAnimationPlayState(State.PlayAnimaionFlag);
+	SetAnimationPlayLoop(State.LoopAnimationFlag);
+	
+	if (State.KinematicModeFlag)
+		SetupKinematicMode();
+	else
+		CancelKinematicMode();
+
+	Form::GetInstance().UpdateTimeline();
+}
+
 void SerializationManager::Autosave(void)
 {
 	if (IsFileOpen())
@@ -68,10 +100,31 @@ void SerializationManager::Tick(double dt)
 	ULONGLONG Now = GetTickCount64();
 	if (LastAutosaveTime + AutosaveInterval < Now)
 		Autosave();
+
+	if (IsAnimationPlaying()) {
+
+		float Len = GetAnimationLength();
+
+		float NewPosition = GetAnimationPosition() + (float)dt;
+		if (IsAnimationLooped())
+			NewPosition = fmod(NewPosition, Len);
+		else
+			NewPosition = std::min(NewPosition, Len);
+
+		SetAnimationPosition(NewPosition);
+
+		if (GetAnimationPosition() >= Len)
+			SetAnimationPlayState(false);
+	}
 }
 
 void SerializationManager::InternalPushStateFrame(bool Forward)
 {
+	if (!HaveCurrentHistory()) {
+		assert(false);
+		return;
+	}
+
 	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
 	State.HaveCharState = true;
 	State.HaveInputState = true;
@@ -100,11 +153,20 @@ void SerializationManager::LimitFrames(vector<SingleSerializedState>& Frames, in
 
 void SerializationManager::CreateNewFile(void)
 {
+	CancelKinematicMode();
+
 	Histories.clear();
+
+	CharacterManager::GetInstance().Reset();
 
 	CreateNewHistory();
 
 	Deserialize();
+
+	SerializeSerializedState State = {};
+	Deserialize(State);
+
+	Form::GetInstance().FullUpdate();
 }
 
 void SerializationManager::CreateNewHistory(void)
@@ -124,17 +186,28 @@ void SerializationManager::CreateNewHistory(void)
 
 int32 SerializationManager::CreateCopyOfCurrentState(void)
 {
-	GetCurrentHistory()->CurrentState.HaveCharState = true;
-	GetCurrentHistory()->CurrentState.HaveInputState = true;
-	GetCurrentHistory()->CurrentState.HaveAnimationState = true;
-	GetCurrentHistory()->CurrentState.HaveRenderState = false;
+	Form::UpdateLock Lock;
+
+	CharacterSerializedState CharState;
+	CharacterManager::GetInstance().Serialize(CharState);
+
+	CancelKinematicMode();
+
+	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
+	State.HaveCharState = true;
+	State.HaveInputState = true;
+	State.HaveAnimationState = true;
+	State.HaveRenderState = false;
 	Serialize();
 
 	SerializedStateHistory Copy = *GetCurrentHistory();
 
 	Copy.ID = NextStateHistoryID++;
+	Copy.CurrentState.CharState = CharState;
 
 	Histories.push_back(Copy);
+
+	Deserialize();
 
 	Form::GetInstance().UpdateTimeline();
 
@@ -143,10 +216,10 @@ int32 SerializationManager::CreateCopyOfCurrentState(void)
 
 bool SerializationManager::LoadHistoryByID(int32 ID)
 {
-	auto CurrentHistory = GetCurrentHistory();
-
-	if (CurrentHistory->ID == ID)
+	if (HaveCurrentHistory() && GetCurrentHistoryID() == ID)
 		return true;
+
+	auto CurrentHistory = GetCurrentHistory();
 
 	auto NextHistory = GetHistoryByID(ID);
 	if (NextHistory == Histories.end())
@@ -172,21 +245,26 @@ uint32 SerializationManager::GetDeletedHistoryCount(void)
 	return Result;
 }
 
+uint32 SerializationManager::GetHistoryCount(void)
+{
+	return (int32)Histories.size() - GetDeletedHistoryCount();
+}
+
 void SerializationManager::DeleteHistory(int32 ID)
 {
 	auto History = GetHistoryByID(ID);
 	if (History != Histories.end()) {
 
-		bool ShouldReloadCurrentHistory = History->ID == GetCurrentHistoryID();
+		bool ShouldReloadCurrentHistory = HaveCurrentHistory() && History->ID == GetCurrentHistoryID();
 
 		History->IsDeleted = true;
 
-		if (GetDeletedHistoryCount() <= 100)
+		if (GetDeletedHistoryCount() <= 3)
 			rotate(Histories.begin(), History, History + 1);
 		else
 			Histories.erase(History);
 	
-		if (GetCurrentHistory()->IsDeleted) {
+		if (GetHistoryCount() <= 0) {
 
 			CharacterManager::GetInstance().Reset();
 			CreateNewHistory();
@@ -221,13 +299,79 @@ void SerializationManager::UndoLastHistoryDeletion(void)
 
 void SerializationManager::ReloadCurrentHistory(void)
 {
+	CancelKinematicMode();
+
 	GetCurrentHistory()->CurrentState.HaveRenderState = false;
 	Deserialize();
 }
 
+bool SerializationManager::HaveCurrentHistory(void)
+{
+	return GetCurrentHistoryID() > 0;
+}
+
 int32 SerializationManager::GetCurrentHistoryID(void)
 {
-	return GetCurrentHistory()->ID;
+	if (!IsInKinematicMode())
+		return GetCurrentHistory()->ID;
+	else
+		return 0;
+}
+
+void SerializationManager::SetCurrentHistoryByID(int32 ID)
+{
+	if (ID > 0) {
+
+		CancelKinematicMode();
+		LoadHistoryByID(ID);
+	}
+	else
+		SetupKinematicMode();
+
+	Form::GetInstance().UpdateTimeline();
+}
+
+void SerializationManager::SetupKinematicMode(void)
+{
+	if (KinematicModeFlag)
+		return;
+
+	// save current state
+	auto State = GetCurrentHistory();
+	State->CurrentState.HaveCharState = true;
+	State->CurrentState.HaveInputState = true;
+	State->CurrentState.HaveAnimationState = true;
+	State->CurrentState.HaveRenderState = true;
+	Serialize();
+
+	KinematicModeFlag = true;
+
+	ProcessAnimaiton();
+
+	Form::GetInstance().FullUpdate();
+}
+
+void SerializationManager::CancelKinematicMode(void)
+{
+	if (!KinematicModeFlag)
+		return;
+
+	Form::UpdateLock Lock;
+
+	SetAnimationPlayState(false);
+
+	KinematicModeFlag = false;
+
+	GetCurrentHistory()->CurrentState.HaveRenderState = false;
+	GetCurrentHistory()->CurrentState.InputState.State = None;
+	Deserialize();
+
+	Form::GetInstance().FullUpdate();
+}
+
+bool SerializationManager::IsInKinematicMode(void)
+{
+	return KinematicModeFlag;
 }
 
 bool SerializationManager::IsFileOpen(void)
@@ -235,9 +379,17 @@ bool SerializationManager::IsFileOpen(void)
 	return LastFileName != L"";
 }
 
-vector<SerializedStateHistory>::iterator SerializationManager::GetCurrentHistory(void)
+vector<SerializedStateHistory>::iterator SerializationManager::GetLatestHistory(void)
 {
 	return Histories.end() - 1;
+}
+
+vector<SerializedStateHistory>::iterator SerializationManager::GetCurrentHistory(void)
+{
+	if (!IsInKinematicMode())
+		return GetLatestHistory();
+	else
+		return Histories.end();
 }
 
 vector<SerializedStateHistory>::iterator SerializationManager::GetHistoryByID(int32 ID)
@@ -250,13 +402,29 @@ vector<SerializedStateHistory>::iterator SerializationManager::GetHistoryByID(in
 	return Histories.end();
 }
 
+wstring ChangeFileExt(const wstring& FileName, const wstring& NewExt) {
+
+	size_t LastSlashPos = FileName.find_last_of(L"\\/");
+	size_t LastDotPos = FileName.find_last_of(L".");
+
+	if (LastSlashPos != string::npos && LastDotPos != string::npos && LastDotPos < LastSlashPos)
+		LastDotPos = string::npos;
+
+	wstring NoExt;
+	if (LastDotPos != string::npos)
+		NoExt = FileName.substr(0, LastDotPos);
+	else
+		NoExt = FileName;
+
+	return NoExt + NewExt;
+}
+
 void SerializationManager::SafeSaveDocumentToFile(XMLDocument& Document, const wstring FileName, int BackupCount)
 {
-	wstring FileNameNoExt = FileName.substr(0, FileName.find_last_of(L"."));
 
-	wstring TempFileName = FileNameNoExt + L".tmp";
-	wstring XmlFileName = FileNameNoExt + L".xml";
-	wstring BackupFileName = FileNameNoExt + L".backup";
+	wstring TempFileName = ChangeFileExt(FileName, L".tmp");
+	wstring XmlFileName = ChangeFileExt(FileName, L".xml");
+	wstring BackupFileName = ChangeFileExt(FileName, L".backup");
 
 	FILE* File = _wfopen(TempFileName.c_str(), L"wb");
 	Document.SaveFile(File, false);
@@ -274,6 +442,9 @@ void SerializationManager::SafeSaveDocumentToFile(XMLDocument& Document, const w
 
 void SerializationManager::PushStateFrame(const wstring Sender)
 {
+	if (!HaveCurrentHistory())
+		return;
+
 	printf("PUSH STATE, SENDER: %ws\n", Sender.c_str());
 
 	GetCurrentHistory()->FutureStates.clear();
@@ -283,6 +454,9 @@ void SerializationManager::PushStateFrame(const wstring Sender)
 
 void SerializationManager::PushPendingStateFrame(SerializationPendingID PendingID, const wstring Sender)
 {
+	if (!HaveCurrentHistory())
+		return;
+
 	assert(PendingID != PendingNone);
 
 	ULONGLONG Now = GetTickCount64();
@@ -296,6 +470,9 @@ void SerializationManager::PushPendingStateFrame(SerializationPendingID PendingI
 
 void SerializationManager::PopAndDeserializeStateFrame(bool Forward)
 {
+	if (!HaveCurrentHistory())
+		return;
+
 	vector<SingleSerializedState>& StackToUse = Forward ? GetCurrentHistory()->FutureStates : GetCurrentHistory()->PreviousStates;
 
 	if (!StackToUse.empty()) {
@@ -306,6 +483,144 @@ void SerializationManager::PopAndDeserializeStateFrame(bool Forward)
 		StackToUse.pop_back();
 
 		Deserialize();
+	}
+}
+
+float SerializationManager::GetAnimationPosition(void)
+{
+	return AnimationPosition;
+}
+
+void SerializationManager::SetAnimationPosition(float Position)
+{
+	AnimationPosition = Position;
+
+	ProcessAnimaiton();
+
+	Form::GetInstance().UpdateTimeline();
+}
+
+float SerializationManager::GetAnimationLength(void)
+{
+	return AnimationLength;
+}
+
+void SerializationManager::SetAnimationLength(float Length)
+{
+	AnimationLength = std::max(Length, 0.1f);
+
+	ProcessAnimaiton();
+
+	Form::GetInstance().UpdateTimeline();
+}
+
+void SerializationManager::GetStatesAndTFromPosition(float Position, float Length, CharacterSerializedState*& PrevState, CharacterSerializedState*& NextState, float& t)
+{
+	vector<CharacterSerializedState*> States;
+
+	for (SerializedStateHistory& History : Histories)
+		if (!History.IsDeleted)
+			States.push_back(&History.CurrentState.CharState);
+
+	if (States.size() == 0) {
+		NextState = nullptr;
+		PrevState = nullptr;
+		t = 0.0f;
+		return;
+	}
+
+	if (States.size() == 1) {
+
+		PrevState = States.front();
+		NextState = States.back();
+		t = 0.0f;
+		return;
+	}
+
+	struct {
+		bool operator()(CharacterSerializedState*& a, CharacterSerializedState*& b) const
+		{
+			return a->AnimationTimestamp < b->AnimationTimestamp;
+		}
+	} StateComparer;
+
+	sort(States.begin(), States.end(), StateComparer);
+
+	int StartIndex = 0;
+	int EndIndex = (int)States.size() - 1;
+
+	uint32 Pos = (uint32)(Position * 1000.0f);
+	uint32 Len = (uint32)(Length * 1000.0f);
+
+	uint32 StartPos = States.front()->AnimationTimestamp;
+	uint32 EndPos = States.back()->AnimationTimestamp;
+
+	uint32 StartLen = StartPos;
+	uint32 EndLen = Len - EndPos;
+
+	if (Pos < StartPos) {
+		PrevState = States.back();
+		NextState = States.front();
+		t = (EndLen + Pos) / (float)(StartLen + EndLen);
+	}
+	else
+	if (Pos > EndPos) {
+		PrevState = States.back();
+		NextState = States.front();
+		t = (Pos - EndPos) / (float)(StartLen + EndLen);
+	} 
+	else {
+
+		for (int Index = 1; Index < States.size(); Index++) {
+
+			CharacterSerializedState* State = States[Index];
+
+			if (Pos <= State->AnimationTimestamp) {
+				NextState = State;
+				PrevState = States[Index - 1];
+				t = (Pos - PrevState->AnimationTimestamp) / (float)(NextState->AnimationTimestamp - PrevState->AnimationTimestamp);
+				return;
+			}
+		}
+
+		throw new runtime_error("logical error in GetStatesAndTFromPosition");
+	}
+}
+
+vec3 lerp(vec3& a, vec3& b, float t) {
+	return a * (1 - t) + b * t;
+}
+
+void SerializationManager::ProcessAnimaiton(void)
+{
+	if (IsInKinematicMode()) {
+
+		CharacterSerializedState *PrevState, *NextState;
+		float t;
+
+		GetStatesAndTFromPosition(GetAnimationPosition(), GetAnimationLength(), PrevState, NextState, t);
+
+		if (PrevState != nullptr && NextState != nullptr) {
+
+			CharacterSerializedState InterpolatedState = {};
+			InterpolatedState.AnimationTimestamp = uint32(GetAnimationPosition() * 1000.0f);
+
+			InterpolatedState.Position = lerp(PrevState->Position, NextState->Position, t);
+
+			for (int Index = 0; Index < PrevState->Bones.size(); Index++) {
+
+				SerializedBone PrevBone = PrevState->Bones[Index];
+				SerializedBone NextBone = NextState->Bones[Index];
+
+				SerializedBone InterpolatedBone;
+				InterpolatedBone.Name = PrevBone.Name;
+				InterpolatedBone.Rotation = slerp(PrevBone.Rotation, NextBone.Rotation, t);
+
+				InterpolatedState.Bones.push_back(InterpolatedBone);
+			}
+
+			CharacterManager::GetInstance().Deserialize(InterpolatedState);
+		}
 	}
 }
 
@@ -324,13 +639,11 @@ vector<TimelineItem> SerializationManager::GetTimelineItems(void)
 
 void SerializationManager::SetTimelineItems(vector<TimelineItem> Items)
 {
-	int32 CurrentID = GetCurrentHistory()->ID;
-
 	for (TimelineItem& Item : Items) {
 
 		uint32 Timestamp = (uint32)(Item.Position * 1000.0f);
 
-		if (Item.ID == CurrentID)
+		if (HaveCurrentHistory() && GetCurrentHistoryID() == Item.ID)
 			CharacterManager::GetInstance().AnimationTimestamp = Timestamp;
 
 		auto History = GetHistoryByID(Item.ID);
@@ -339,22 +652,41 @@ void SerializationManager::SetTimelineItems(vector<TimelineItem> Items)
 	}
 }
 
+void SerializationManager::SetAnimationPlayState(bool PlayAnimation)
+{
+	PlayAnimaionFlag = PlayAnimation;
+
+	if (PlayAnimaionFlag)
+		SetupKinematicMode();
+}
+
+bool SerializationManager::IsAnimationPlaying(void)
+{
+	return PlayAnimaionFlag;
+}
+
+void SerializationManager::SetAnimationPlayLoop(bool LoopAnimation)
+{
+	LoopAnimationFlag = LoopAnimation;
+}
+
+bool SerializationManager::IsAnimationLooped(void)
+{
+	return LoopAnimationFlag;
+}
+
 // Utils
 
 wstring s2ws(const string& str)
 {
-	using convert_typeX = codecvt_utf8<wchar_t>;
-	wstring_convert<convert_typeX, wchar_t> converterX;
-
-	return converterX.from_bytes(str);
+	wstring Result(str.begin(), str.end());
+	return Result;
 }
 
 string ws2s(const wstring& wstr)
 {
-	using convert_typeX = codecvt_utf8<wchar_t>;
-	wstring_convert<convert_typeX, wchar_t> converterX;
-
-	return converterX.to_bytes(wstr);
+	string Result(wstr.begin(), wstr.end());
+	return Result;
 }
 
 float attribute_float_value(XMLElement* Element, const char* AttributeName) {
@@ -392,6 +724,9 @@ uint32 attribute_uint32_value(XMLElement* Element, const char* AttributeName) {
 
 void SerializationManager::LoadFromFile(wstring FileName)
 {
+	Form::UpdateLock Lock;
+
+	// fast cleanup
 	Histories.clear();
 
 	FILE* File = _wfopen(FileName.c_str(), L"rb");
@@ -400,9 +735,6 @@ void SerializationManager::LoadFromFile(wstring FileName)
 		XMLDocument Document;
 		Document.LoadFile(File);
 		fclose(File);
-
-		float Position = 0.0f;
-		bool KinematicModeFlag = false;
 
 		XMLNode* Root = Document.FirstChildElement("Root");
 		if (Root != nullptr) {
@@ -431,18 +763,16 @@ void SerializationManager::LoadFromFile(wstring FileName)
 
 			sort(Histories.begin(), Histories.end(), HistoryComparer);
 
-			if (!Histories.empty()) 
+			if (!Histories.empty()) {
+
+				GetCurrentHistory()->CurrentState.InputState.State = None;
 				Deserialize();
-
-			XMLElement* AnimationElement = Root->FirstChildElement("Animation");
-			if (AnimationElement != nullptr) {
-
-				Position = attribute_float_value(AnimationElement, "Position");
-				KinematicModeFlag = attribute_bool_value(AnimationElement, "KinematicMode", false);
 			}
-		}
 
-		AnimationManager::GetInstance().SetAnimationState(Position, KinematicModeFlag ? 0 : GetCurrentHistoryID());
+			SerializeSerializedState State;
+			if (State.LoadFromXML(Document, Root))
+				Deserialize(State);
+		}
 
 		LastAutosaveTime = GetTickCount64();
 	}
@@ -461,16 +791,30 @@ void SerializationManager::LoadFromFile(wstring FileName)
 
 		SaveSettings();
 	}
+
+	Form::GetInstance().UpdateTimeline();
 }
 
-void SerializationManager::SaveToFile(const wstring FileName)
+void SerializationManager::SaveToFile(wstring FileName)
 {
-	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
-	State.HaveCharState = true;
-	State.HaveInputState = true;
-	State.HaveAnimationState = true;
-	State.HaveRenderState = true;
-	Serialize();
+	FileName = ChangeFileExt(FileName, L".xml");
+
+	if (HaveCurrentHistory()) {
+
+		SingleSerializedState& State = GetCurrentHistory()->CurrentState;
+		State.HaveCharState = true;
+		State.HaveInputState = true;
+		State.HaveAnimationState = true;
+		State.HaveRenderState = true;
+		Serialize();
+	}
+	else {
+
+		SingleSerializedState& State = GetLatestHistory()->CurrentState;
+
+		Render::GetInstance().Serialize(State.RenderState);
+		State.HaveRenderState = true;
+	}
 
 	XMLDocument Document;
 
@@ -485,12 +829,18 @@ void SerializationManager::SaveToFile(const wstring FileName)
 		SaveStates(States, Document, StatesElement);
 	}
 
-	XMLElement* AnimationState = Document.NewElement("Animation");
-	Root->InsertEndChild(AnimationState);
-	AnimationState->SetAttribute("Position", AnimationManager::GetInstance().GetAnimationPosition());
-	AnimationState->SetAttribute("KinematicMode", AnimationManager::GetInstance().IsInKinematicMode());
+	SerializeSerializedState State;
+	Serialize(State);
+	State.SaveToXML(Document, Root);
 
 	SafeSaveDocumentToFile(Document, FileName, MaxBackupCount);
+
+	if (LastFileName != FileName) {
+
+		LastFileName = FileName;
+
+		SaveSettings();
+	}
 
 	LastAutosaveTime = GetTickCount64();
 }
@@ -513,8 +863,7 @@ void SerializationManager::LoadSettings(void)
 			LastFileName = s2ws(attribute_value(LastFile, "Name"));
 	}
 
-	if (LastFileName != L"")
-		LoadFromFile(LastFileName);
+	LoadFromFile(LastFileName);
 }
 
 void SerializationManager::SaveSettings(void)
@@ -905,6 +1254,43 @@ bool RenderSerializedState::LoadFromXML(XMLDocument& Document, XMLNode* Root)
 	if (CameraAngle != nullptr) {
 		this->CameraAngleX = radians(attribute_float_value(CameraAngle, "X"));
 		this->CameraAngleZ = radians(attribute_float_value(CameraAngle, "Z"));
+	}
+
+	return true;
+}
+
+// SerializeSerializedState
+
+void SerializeSerializedState::SaveToXML(XMLDocument& Document, XMLNode* Root)
+{
+	XMLNode* SerializeState = Document.NewElement("SerializeState");
+
+	XMLElement* Animation = Document.NewElement("Animation");
+	Animation->SetAttribute("Position", this->AnimationPosition);
+	Animation->SetAttribute("Length", this->AnimationLength);
+	Animation->SetAttribute("KinematicMode", this->KinematicModeFlag);
+	Animation->SetAttribute("Loop", this->LoopAnimationFlag);
+	Animation->SetAttribute("Play", this->PlayAnimaionFlag);
+	SerializeState->InsertEndChild(Animation);
+
+	Root->InsertEndChild(SerializeState);
+}
+
+bool SerializeSerializedState::LoadFromXML(XMLDocument& Document, XMLNode* Root)
+{
+	*this = {};
+
+	XMLNode* SerializeState = Root->FirstChildElement("SerializeState");
+	if (SerializeState == nullptr)
+		return false;
+
+	XMLElement* Animation = SerializeState->FirstChildElement("Animation");
+	if (Animation != nullptr) {
+		this->AnimationPosition = attribute_float_value(Animation, "Position");
+		this->AnimationLength = attribute_float_value(Animation, "Length");
+		this->KinematicModeFlag = attribute_bool_value(Animation, "KinematicMode", false);
+		this->LoopAnimationFlag = attribute_bool_value(Animation, "Loop", false);
+		this->PlayAnimaionFlag = attribute_bool_value(Animation, "Play", false);
 	}
 
 	return true;

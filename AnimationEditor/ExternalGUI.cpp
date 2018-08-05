@@ -24,7 +24,7 @@ void(__stdcall *aegSetEnabled)(const wchar_t* Name, bool IsEnabled);
 void(__stdcall *aegSetChecked)(const wchar_t* Name, bool IsChecked);
 void(__stdcall *aegSetText)(const wchar_t* Name, const wchar_t* Text);
 void(__stdcall *aegSetPosition)(const wchar_t* Name, float t);
-void(__stdcall *aegSetTimelineState)(float Position, int32 SelectedID, TimelineItem* Items, int32 ItemsCount);
+void(__stdcall *aegSetTimelineState)(float Position, float Length, int32 SelectedID, TimelineItem* Items, int32 ItemsCount);
 
 void(__stdcall *aegRun)(void);
 

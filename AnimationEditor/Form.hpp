@@ -42,8 +42,8 @@ private:
 	void EditCallback(const wstring Name, const wstring Text);
 	static void __stdcall TrackBarStaticCallback(const wchar_t* Name, float t);
 	void TrackBarCallback(const wstring Name, float t);
-	static void __stdcall TimelineStaticCallback(float Position, int32 SelectedID, TimelineItem* Items, int32 ItemsCount);
-	void TimelineCallback(float Position, int32 SelectedID, vector<TimelineItem> Items);
+	static void __stdcall TimelineStaticCallback(float Position, float Length, int32 SelectedID, TimelineItem* Items, int32 ItemsCount);
+	void TimelineCallback(float Position, float Length, int32 SelectedID, vector<TimelineItem> Items);
 public:
 	static Form& GetInstance(void) {
 		static Form Instance;

@@ -16,10 +16,13 @@
 #include "InputManager.hpp"
 #include "AnimationManager.hpp"
 #include "CharacterManager.hpp"
+#include "SerializationManager.hpp"
 #include "shader.hpp"
 #include "texture.hpp"
 
 void Render::DrawScene(void) {
+
+	bool IsKinematic = SerializationManager::GetInstance().IsInKinematicMode();
 
 	// Clear the screen
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -27,19 +30,21 @@ void Render::DrawScene(void) {
 	DrawFloor();
 
 	Character* Char = CharacterManager::GetInstance().GetCharacter();
-	DrawCharacter(Char);
+	DrawCharacter(Char, IsKinematic);
 
 	// DrawCharacterGrid();
 	
-	DrawAxes();
+	if (!IsKinematic) {
+		DrawAxes();
 
-	DrawPickedPoint();
+		DrawPickedPoint();
+	}
 
 	glFlush();
 	SwapBuffers(WindowDC);
 }
 
-void Render::DrawCharacter(Character* Char) {
+void Render::DrawCharacter(Character* Char, bool IsKinematic) {
 
 	SetWireframeMode(false);
 	EnableLighting(true);
@@ -50,19 +55,19 @@ void Render::DrawCharacter(Character* Char) {
 
 		vec4 Color;
 
-		if (Bone == Selection.Bone)
+		if (!IsKinematic && Bone == Selection.Bone)
 			Color = { 255 / 255.0f, 163 / 255.0f, 0, 1 };
 		else 
 			Color = { 0.7, 0.7, 0.7, 1 };
 
-		if (AnimationManager::GetInstance().GetBoneBlocking(Bone).IsFullyBlocked())
+		if (!IsKinematic && AnimationManager::GetInstance().GetBoneBlocking(Bone).IsFullyBlocked())
 			Color = vec4(vec3(Color) * 0.36f, 1);
 	
 		SetColors(Color);
 
 		DrawCube(Bone->WorldTransform * Bone->MiddleTranslation, Bone->Size);
 
-		if (Bone->AnimCtx->Pinpoint.IsActive()) {
+		if (!IsKinematic && Bone->AnimCtx->Pinpoint.IsActive()) {
 
 			SetWireframeMode(true);
 			SetColors({ 0, 0, 1, 0.7 });
@@ -73,20 +78,23 @@ void Render::DrawCharacter(Character* Char) {
 		}
 	}
 
-	EnableLighting(false);
-	SetColors({ 0, 0.7, 0, 1 });
+	if (!IsKinematic) {
 
-	for (Bone* Bone : Char->Bones) {
+		EnableLighting(false);
+		SetColors({ 0, 0.7, 0, 1 });
 
-		mat4 World = Bone->WorldTransform * Bone->MiddleTranslation;
+		for (Bone* Bone : Char->Bones) {
 
-		vec3 LocalBoneCenter = Bone->LogicalDirection * (dot(Bone->LogicalDirection, Bone->Size) * 0.5f);
-		vec3 LocalDirectionEnd = LocalBoneCenter + Bone->LogicalDirection * 0.125f;
+			mat4 World = Bone->WorldTransform * Bone->MiddleTranslation;
 
-		vec3 WorldBoneCenter = World * vec4(LocalBoneCenter, 1);
-		vec3 WorldDirectionEnd = World * vec4(LocalDirectionEnd, 1);
+			vec3 LocalBoneCenter = Bone->LogicalDirection * (dot(Bone->LogicalDirection, Bone->Size) * 0.5f);
+			vec3 LocalDirectionEnd = LocalBoneCenter + Bone->LogicalDirection * 0.125f;
 
-		DrawLine(WorldBoneCenter, WorldDirectionEnd);
+			vec3 WorldBoneCenter = World * vec4(LocalBoneCenter, 1);
+			vec3 WorldDirectionEnd = World * vec4(LocalDirectionEnd, 1);
+
+			DrawLine(WorldBoneCenter, WorldDirectionEnd);
+		}
 	}
 }
 

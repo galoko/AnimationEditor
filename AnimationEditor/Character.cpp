@@ -42,9 +42,13 @@ void NormalizeLimits(vec3* LowLimit, vec3* HighLimit) {
 	NormalizeLimit(&LowLimit->z, &HighLimit->z);
 }
 
+vec3 GetMirrorVector(vec3 MirrorDirection) {
+	return cross(MirrorDirection, cross(MirrorDirection, vec3(-1.0f))) - MirrorDirection;
+}
+
 void Character::GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 MirrorDirection)
 {
-	vec3 MirrorVector = cross(MirrorDirection, cross(MirrorDirection, vec3(-1.0f))) - MirrorDirection;
+	vec3 MirrorVector = GetMirrorVector(MirrorDirection);
 
 	float MetersToCm = 100.0f;
 
@@ -53,13 +57,14 @@ void Character::GenerateRightSide(Bone* LeftBone, Bone* RightParent, vec3 Mirror
 
 	NormalizeLimits(&LowLimit, &HighLimit);
 
-	Bone* RightBone = new Bone(NextBoneID++, L"Right " + LeftBone->Name,
+	Bone* RightBone = new Bone(NextBoneID++, LeftBone->GetOriginalName(),
 		LeftBone->Offset * MirrorVector, LeftBone->Tail * MirrorVector, LeftBone->Size,
 		LowLimit, HighLimit, LeftBone->LogicalDirection * MirrorVector, RightParent);
 
 	Bones.push_back(RightBone);
 
-	LeftBone->Name = L"Left " + LeftBone->Name;
+	RightBone->Side = Bone::Right;
+	LeftBone->Side = Bone::Left;
 
 	for (Bone* LeftChild : LeftBone->Childs)
 		GenerateRightSide(LeftChild, RightBone, MirrorDirection);
@@ -100,7 +105,7 @@ void Character::GenerateBones(void)
 		{ 1, 0, 0 }, L"Lower Leg");
 	Bone* Foot = GenerateBone(LowerLeg, { 15.5f / 22.0f, 0, 0 }, { 22.0f, 8.0f, 3.0f }, { 0, 0, -1.175f }, 
 		{  -25,  -70,   -5 }, 
-		{   25,   30,    5 }, 
+		{   25,   45,    5 }, 
 		{ 0, 0, 1 }, L"Foot");
 
 	GenerateRightSide(UpperLeg, UpperLeg->Parent, { 0, 1, 0 });
@@ -157,11 +162,6 @@ void Character::Reset(void)
 	UpdateWorldTranforms();
 }
 
-void Character::Mirror(void)
-{
-	// TODO
-}
-
 void Character::CalculateJointLocations(void)
 {
 	for (Bone* Child : Bones) {
@@ -183,9 +183,17 @@ void Character::CalculateJointLocations(void)
 
 Bone* Character::FindBone(const wstring Name)
 {
-	for (Bone* Bone : this->Bones)
-		if (Bone->Name.find(Name) != -1)
+	for (Bone* Bone : Bones)
+		if (Bone->GetName().find(Name) != -1)
 			return Bone;
+	return nullptr;
+}
+
+Bone* Character::FindOtherBone(Bone* CurrentBone)
+{
+	for (Bone* Bone : Bones) 
+		if (Bone->GetOriginalName() == CurrentBone->GetOriginalName() && Bone->Side != CurrentBone->Side)
+			return Bone;	
 	return nullptr;
 }
 
@@ -243,6 +251,30 @@ vec3 Bone::UpdateRotationFromWorldTransform(mat4 ParentWorldRotation)
 		Child->UpdateRotationFromWorldTransform(Rotation);
 
 	return Translation;
+}
+
+wstring Bone::GetName(void)
+{
+	wstring Prefix;
+
+	switch (Side) {
+	case Left:
+		Prefix = L"Left ";
+		break;
+	case Right:
+		Prefix = L"Right ";
+		break;
+	default:
+		Prefix = L"";
+		break;
+	}
+
+	return Prefix + GetOriginalName();
+}
+
+wstring Bone::GetOriginalName(void)
+{
+	return Name;
 }
 
 bool Bone::IsFixed(void)

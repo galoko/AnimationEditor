@@ -24,6 +24,9 @@ void AnimationManager::Initialize(void) {
 
 void AnimationManager::Tick(double dt) {
 
+	if (SerializationManager::GetInstance().IsInKinematicMode())
+		return;
+
 	PhysicsManager::GetInstance().Tick(dt);
 
 	Form::GetInstance().UpdatePositionAndAngles();
@@ -111,31 +114,6 @@ void AnimationManager::UnblockAllBones(void)
 		SetBoneBlocking(Bone, AllUnblocked);
 }
 
-float AnimationManager::GetAnimationPosition(void)
-{
-	return AnimationPosition;
-}
-
-bool AnimationManager::IsInKinematicMode(void)
-{
-	return KinematicModeFlag;
-}
-
-void AnimationManager::SetAnimationState(float Position, int32 SelectedID)
-{
-	SerializationManager::GetInstance().PushPendingStateFrame(PendingAnimationState, L"Animation State change");
-
-	Form::UpdateLock Lock;
-
-	AnimationPosition = Position;
-
-	KinematicModeFlag = (SelectedID <= 0) || !SerializationManager::GetInstance().LoadHistoryByID(SelectedID);
-
-	InputManager::GetInstance().UpdateAnimationKinematicMode();
-
-	Form::GetInstance().UpdateTimeline();
-}
-
 void AnimationManager::Serialize(AnimationSerializedState& State)
 {
 	State.Contexts.clear();
@@ -145,7 +123,7 @@ void AnimationManager::Serialize(AnimationSerializedState& State)
 
 		SerializedAnimationContext SerializedContext;
 
-		SerializedContext.BoneName = Bone->Name;
+		SerializedContext.BoneName = Bone->GetName();
 
 		SerializedContext.Blocking.XPos  = Bone->AnimCtx->Blocking.XPos;
 		SerializedContext.Blocking.YPos  = Bone->AnimCtx->Blocking.YPos;
@@ -180,7 +158,7 @@ void AnimationManager::Deserialize(AnimationSerializedState& State)
 		SerializedContext.Blocking.ZAxis = true;
 
 		for (SerializedAnimationContext& Context : State.Contexts)
-			if (Context.BoneName == Bone->Name) {
+			if (Context.BoneName == Bone->GetName()) {
 				SerializedContext = Context;
 				break;
 			}

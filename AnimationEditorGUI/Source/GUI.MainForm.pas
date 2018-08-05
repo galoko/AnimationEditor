@@ -40,6 +40,9 @@ type
     DeleteState: TButton;
     MirrorState: TButton;
     UndoDelete: TButton;
+    AnimationLength: TEdit;
+    PlayStop: TButton;
+    AnimationLoop: TCheckBox;
     procedure ApplicationEventsMessage(var Msg: tagMSG; var Handled: Boolean);
     procedure FormCreate(Sender: TObject);
     procedure ButtonClick(Sender: TObject);
@@ -73,7 +76,7 @@ type
     procedure SetChecked(const Name: String; IsChecked: Boolean);
     procedure SetText(const Name, Text: String);
     procedure SetPosition(const Name: String; t: Single);
-    procedure SetTimelineState(Position: Single; SelectedID: Integer; const Items: TArray<TTimelineItem>);
+    procedure SetTimelineState(Position, Length: Single; SelectedID: Integer; const Items: TArray<TTimelineItem>);
   end;
 
 var
@@ -197,7 +200,7 @@ begin
   if Assigned(TimelineCallback) then
   begin
     Items:= Timeline.Items;
-    TimelineCallback(Timeline.Position, Timeline.SelectedID, PTimelineItem(Items), Length(Items));
+    TimelineCallback(Timeline.Position, Timeline.Length, Timeline.SelectedID, PTimelineItem(Items), Length(Items));
   end;
 end;
 
@@ -297,13 +300,14 @@ begin
   end;
 end;
 
-procedure TAnimationEditorForm.SetTimelineState(Position: Single; SelectedID: Integer; const Items: TArray<TTimelineItem>);
+procedure TAnimationEditorForm.SetTimelineState(Position, Length: Single; SelectedID: Integer; const Items: TArray<TTimelineItem>);
 begin
   Timeline.Lock;
   try
+    Timeline.Items:= Items;
+    Timeline.Length:= Length;
     Timeline.Position:= Position;
     Timeline.SelectedID:= SelectedID;
-    Timeline.Items:= Items;
   finally
     Timeline.Unlock;
   end;

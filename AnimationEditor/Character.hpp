@@ -13,9 +13,10 @@ using namespace glm;
 struct AnimationContext;
 
 typedef class Bone {
+private:
+	wstring Name;
 public:
 	uint32 ID;
-	wstring Name;
 
 	vec3 Offset, Tail, Size, LowLimit, HighLimit;
 
@@ -27,6 +28,14 @@ public:
 	vec3 LogicalDirection;
 
 	uint32 Depth;
+
+	typedef enum BoneSide {
+		Center, 
+		Left,
+		Right
+	} BoneSide;
+
+	BoneSide Side;
 
 	float Mass;
 
@@ -47,6 +56,9 @@ public:
 
 	void UpdateWorldTransform(mat4 ParentModel, vec3 ParentSize);
 	vec3 UpdateRotationFromWorldTransform(mat4 ParentWorldRotation);
+
+	wstring GetName(void);
+	wstring GetOriginalName(void);
 } Bone;
 
 typedef class Character {
@@ -74,7 +86,7 @@ public:
 	void UpdateFloorZ(void);
 
 	void Reset(void);
-	void Mirror(void);
 
 	Bone* FindBone(const wstring Name);
+	Bone* FindOtherBone(Bone* CurrentBone);
 } Character;

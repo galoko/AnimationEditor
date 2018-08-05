@@ -73,7 +73,7 @@ type
     constructor Create(AOwner: TComponent); override;
 
     property Position : Single read CursorPosition write SetCursorPosition;
-    property Length : Single write SetLength;
+    property Length : Single read TimelineLength write SetLength;
     property Items : TArray<TTimelineItem> read GetItems write SetItems;
     property SelectedID : Integer read GetSelectedID write SetSelectedID;
 
@@ -113,9 +113,6 @@ end;
 procedure TTimeline.SceneMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  if X = LastMouseX then
-    Exit;
-
   ActiveIndex:= GetIndexByX(X);
 
   if ActiveIndex < 0 then
@@ -142,9 +139,6 @@ end;
 procedure TTimeline.SceneMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  if X = LastMouseX then
-    Exit;
-
   if ActiveIndex < 0 then
     SetActivePositionFromX(X, 'Up');
 
@@ -220,6 +214,8 @@ var
   Index: Integer;
 begin
   Result:= INDEX_NONE;
+  if ID <= 0 then
+    Exit;
 
   for Index := 0 to System.Length(CurrentItems) - 1 do
     if CurrentItems[Index].ID = ID then

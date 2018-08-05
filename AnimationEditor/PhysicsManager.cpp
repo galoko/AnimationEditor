@@ -455,6 +455,36 @@ void PhysicsManager::SyncWorldWithCharacter(void)
 		Bone->PhysicBody->setWorldTransform(GLMToBullet(Bone->WorldTransform * Bone->MiddleTranslation));
 }
 
+void PhysicsManager::MirrorCharacter(void)
+{
+	Character* Char = CharacterManager::GetInstance().GetCharacter();
+
+	for (Bone* CurrentBone : Char->Bones) {
+
+		vec3 Angles = GetBoneAngles(CurrentBone);
+
+		if (CurrentBone->Side == Bone::Center) {
+
+			Angles *= vec3(-1, 1, 1);
+
+			SetBoneAngles(CurrentBone, Angles);
+		}
+		else
+		if (CurrentBone->Side == Bone::Left) {
+			Bone* OtherBone = Char->FindOtherBone(CurrentBone);
+			if (OtherBone != nullptr) {
+
+				vec3 OtherAngles = GetBoneAngles(OtherBone);
+
+				vec3 MirrorVector = vec3(-1, 1, -1);
+
+				SetBoneAngles(CurrentBone, OtherAngles * MirrorVector);
+				SetBoneAngles(OtherBone, Angles * MirrorVector);
+			}
+		}
+	}
+}
+
 btRigidBody* PhysicsManager::AddDynamicBox(mat4 Transform, vec3 Size, float Mass)
 {
 	Size *= 0.5f;

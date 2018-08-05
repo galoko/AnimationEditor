@@ -32,6 +32,9 @@ void UnloadExternalGUI(void);
 #define DELETE_STATE        L"DeleteState"
 #define UNDO_DELETE         L"UndoDelete"
 #define MIRROR_STATE        L"MirrorState"
+#define ANIMATION_LENGTH    L"AnimationLength"
+#define PLAY_STOP           L"PlayStop"
+#define ANIMATION_LOOP      L"AnimationLoop"	 
 
 typedef struct TimelineItem {
 	int32 ID;
@@ -42,7 +45,7 @@ typedef void (__stdcall *ButtonCallback)(const wchar_t* Name);
 typedef void (__stdcall *CheckBoxCallback)(const wchar_t* Name, bool IsChecked);
 typedef void (__stdcall *EditCallback)(const wchar_t* Name, const wchar_t* Text);
 typedef void (__stdcall *TrackBarCallback)(const wchar_t* Name, float t);
-typedef void (__stdcall *TimelineCallback)(float Position, int32 SelectedID, TimelineItem* Items, int32 ItemsCount);
+typedef void (__stdcall *TimelineCallback)(float Position, float Length, int32 SelectedID, TimelineItem* Items, int32 ItemsCount);
 typedef void (__stdcall *IdleCallback)(void);
 
 extern void (__stdcall *aegInitialize)(void);
@@ -59,7 +62,7 @@ extern void (__stdcall *aegSetEnabled)(const wchar_t* Name, bool IsEnabled);
 extern void (__stdcall *aegSetChecked)(const wchar_t* Name, bool IsChecked);
 extern void (__stdcall *aegSetText)(const wchar_t* Name, const wchar_t* Text);
 extern void (__stdcall *aegSetPosition)(const wchar_t* Name, float t);
-extern void (__stdcall *aegSetTimelineState)(float Position, int32 SelectedID, TimelineItem* Items, int32 ItemsCount);
+extern void (__stdcall *aegSetTimelineState)(float Position, float Length, int32 SelectedID, TimelineItem* Items, int32 ItemsCount);
 
 extern void (__stdcall *aegRun)(void);
 

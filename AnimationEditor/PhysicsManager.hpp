@@ -35,7 +35,7 @@ private:
 
 	const double fixed_dt = 1.0 / (double)PHYSICS_FPS;
 
-	const int MaxStepsPerTick = 100;
+	const int MaxStepsPerTick = 34;
 
 	const void* SOLID_ID = (void*)1;
 	const void* NON_SOLID_ID = (void*)2;
@@ -122,4 +122,6 @@ public:
 	void SetBoneAngles(Bone* Bone, vec3 Angles);
 
 	void SyncWorldWithCharacter(void);
+
+	void MirrorCharacter(void);
 } PhysicsManager;

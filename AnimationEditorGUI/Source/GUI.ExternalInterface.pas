@@ -12,7 +12,7 @@ type
   TCheckBoxCallback = procedure (const Name: PWideChar; IsChecked: Boolean); stdcall;
   TEditCallback = procedure (const Name, Text: PWideChar); stdcall;
   TTrackBarCallback = procedure (const Name: PWideChar; t: Single); stdcall;
-  TTimelineCallback = procedure (Position: Single; SelectedID: Integer; Items: PTimelineItem; ItemsCount: Integer); stdcall;
+  TTimelineCallback = procedure (Position, Length: Single; SelectedID: Integer; Items: PTimelineItem; ItemsCount: Integer); stdcall;
   TIdleCallback = procedure; stdcall;
 
 procedure aegInitialize; stdcall;
@@ -29,7 +29,7 @@ procedure aegSetEnabled(const Name: PWideChar; IsEnabled: Boolean); stdcall;
 procedure aegSetChecked(const Name: PWideChar; IsChecked: Boolean); stdcall;
 procedure aegSetText(const Name, Text: PWideChar); stdcall;
 procedure aegSetPosition(const Name: PWideChar; t: Single); stdcall;
-procedure aegSetTimelineState(Position: Single; SelectedID: Integer; Items: PTimelineItem; ItemsCount: Integer); stdcall;
+procedure aegSetTimelineState(Position, Length: Single; SelectedID: Integer; Items: PTimelineItem; ItemsCount: Integer); stdcall;
 
 procedure aegRun; stdcall;
 procedure aegFinalize; stdcall;
@@ -128,15 +128,15 @@ begin
   AnimationEditorForm.SetPosition(Name, t);
 end;
 
-procedure aegSetTimelineState(Position: Single; SelectedID: Integer; Items: PTimelineItem; ItemsCount: Integer);
+procedure aegSetTimelineState(Position, Length: Single; SelectedID: Integer; Items: PTimelineItem; ItemsCount: Integer);
 var
   ItemsArray: TArray<TTimelineItem>;
 begin
   SetLength(ItemsArray, ItemsCount);
   if ItemsCount > 0 then
-    Move(Items^, ItemsArray[0], Length(ItemsArray) * SizeOf(ItemsArray[0]));
+    Move(Items^, ItemsArray[0], System.Length(ItemsArray) * SizeOf(ItemsArray[0]));
 
-  AnimationEditorForm.SetTimelineState(Position, SelectedID, ItemsArray);
+  AnimationEditorForm.SetTimelineState(Position, Length, SelectedID, ItemsArray);
 end;
 
 procedure aegRun;

@@ -71,6 +71,14 @@ typedef struct RenderSerializedState {
 	bool LoadFromXML(XMLDocument& Document, XMLNode *Root);
 } RenderSerializedState;
 
+typedef struct SerializeSerializedState {
+	float AnimationPosition, AnimationLength;
+	bool KinematicModeFlag, PlayAnimaionFlag, LoopAnimationFlag;
+
+	void SaveToXML(XMLDocument& Document, XMLNode *Root);
+	bool LoadFromXML(XMLDocument& Document, XMLNode *Root);
+} SerializeSerializedState;
+
 typedef enum SerializationPendingID {
 	PendingNone,
 	PendingAnglesTrackBar,
@@ -111,6 +119,9 @@ private:
 
 	wstring SettingsFileName;
 
+	float AnimationPosition, AnimationLength;
+	bool KinematicModeFlag, PlayAnimaionFlag, LoopAnimationFlag;
+
 	SerializationManager(void) { };
 
 	void LoadSettings(void);
@@ -118,6 +129,9 @@ private:
 
 	void Serialize(void);
 	void Deserialize(void);
+
+	void Serialize(SerializeSerializedState& State);
+	void Deserialize(SerializeSerializedState& State);
 
 	void LoadState(SingleSerializedState& State, XMLDocument& Document, XMLNode* Root);
 	void SaveState(SingleSerializedState& State, XMLDocument& Document, XMLNode* Root);
@@ -136,8 +150,12 @@ private:
 
 	bool IsFileOpen(void);
 
+	vector<SerializedStateHistory>::iterator GetLatestHistory(void);
 	vector<SerializedStateHistory>::iterator GetCurrentHistory(void);
 	vector<SerializedStateHistory>::iterator GetHistoryByID(int32 ID);
+
+	void GetStatesAndTFromPosition(float Position, float Length, CharacterSerializedState*& PrevState, CharacterSerializedState*& NextState, float& t);
+	void ProcessAnimaiton(void);
 
 	void SafeSaveDocumentToFile(XMLDocument& Document, const wstring FileName, int BackupCount);
 public:
@@ -153,7 +171,7 @@ public:
 	void Initialize(const wstring WorkingDirectory);
 
 	void LoadFromFile(wstring FileName);
-	void SaveToFile(const wstring FileName);
+	void SaveToFile(wstring FileName);
 
 	void Autosave(void);
 
@@ -164,17 +182,35 @@ public:
 	int32 CreateCopyOfCurrentState(void);
 	bool LoadHistoryByID(int32 ID);
 	uint32 GetDeletedHistoryCount(void);
+	uint32 GetHistoryCount(void);
 	void DeleteHistory(int32 ID);
 	void UndoLastHistoryDeletion(void);
 	void ReloadCurrentHistory(void);
+	bool HaveCurrentHistory(void);
 	int32 GetCurrentHistoryID(void);
+	void SetCurrentHistoryByID(int32 ID);
+	
+	void SetupKinematicMode(void);
+	void CancelKinematicMode(void);
+	bool IsInKinematicMode(void);
 
 	const int PendingTimeout = 250;
 
 	void PushStateFrame(const wstring Sender);
 	void PushPendingStateFrame(SerializationPendingID PendingID, const wstring Sender);
 	void PopAndDeserializeStateFrame(bool Forward);
+	
+	float GetAnimationPosition(void);
+	void SetAnimationPosition(float Position);
+
+	float GetAnimationLength(void);
+	void SetAnimationLength(float Length);
 
 	vector<TimelineItem> GetTimelineItems(void);
 	void SetTimelineItems(vector<TimelineItem> Items);
+
+	void SetAnimationPlayState(bool PlayAnimation);
+	bool IsAnimationPlaying(void);
+	void SetAnimationPlayLoop(bool LoopAnimation);
+	bool IsAnimationLooped(void);
 } SerializationManager;

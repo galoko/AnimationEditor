@@ -33,9 +33,6 @@ typedef class AnimationManager {
 private:
 	AnimationManager(void) { };
 
-	float AnimationPosition;
-	bool KinematicModeFlag;
-
 	PhysicsManager::Pinpoint IKPinpoint;
 
 	void PhysicsPreSolve(void);
@@ -64,10 +61,6 @@ public:
 
 	void BlockEverythingExceptThisBranch(Bone* Parent, Bone* Exception);
 	void UnblockAllBones(void);
-
-	float GetAnimationPosition(void);
-	bool IsInKinematicMode(void);
-	void SetAnimationState(float Position, int32 SelectedID);
 
 	void Serialize(AnimationSerializedState& State);
 	void Deserialize(AnimationSerializedState& State);

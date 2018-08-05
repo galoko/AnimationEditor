@@ -59,7 +59,7 @@ private:
 	void DrawLine(vec3 Start, vec3 End);
 	void DrawGrid(vec3 Position, float Size, float Spacing);
 
-	void DrawCharacter(Character* Char);
+	void DrawCharacter(Character* Char, bool IsKinematic);
 	void DrawFloor(void);
 	void DrawPickedPoint(void);
 	void DrawCharacterGrid(void);

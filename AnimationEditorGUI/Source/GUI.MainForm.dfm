@@ -38,7 +38,7 @@ object AnimationEditorForm: TAnimationEditorForm
     end
     object XAxis: TCheckBox
       Left = 352
-      Top = 20
+      Top = 7
       Width = 50
       Height = 17
       Caption = 'X Axis'
@@ -46,7 +46,7 @@ object AnimationEditorForm: TAnimationEditorForm
     end
     object YAxis: TCheckBox
       Left = 352
-      Top = 43
+      Top = 30
       Width = 50
       Height = 17
       Caption = 'Y Axis'
@@ -54,7 +54,7 @@ object AnimationEditorForm: TAnimationEditorForm
     end
     object ZAxis: TCheckBox
       Left = 352
-      Top = 66
+      Top = 53
       Width = 50
       Height = 17
       Caption = 'Z Axis'
@@ -62,7 +62,7 @@ object AnimationEditorForm: TAnimationEditorForm
     end
     object XPos: TCheckBox
       Left = 215
-      Top = 20
+      Top = 7
       Width = 66
       Height = 17
       Caption = 'X Position'
@@ -70,7 +70,7 @@ object AnimationEditorForm: TAnimationEditorForm
     end
     object YPos: TCheckBox
       Left = 215
-      Top = 43
+      Top = 30
       Width = 66
       Height = 17
       Caption = 'Y Position'
@@ -78,7 +78,7 @@ object AnimationEditorForm: TAnimationEditorForm
     end
     object ZPos: TCheckBox
       Left = 215
-      Top = 66
+      Top = 53
       Width = 66
       Height = 17
       Caption = 'Z Position'
@@ -86,49 +86,49 @@ object AnimationEditorForm: TAnimationEditorForm
     end
     object XPosInput: TEdit
       Left = 287
-      Top = 16
+      Top = 3
       Width = 49
       Height = 21
       TabOrder = 7
     end
     object YPosInput: TEdit
       Left = 287
-      Top = 43
+      Top = 30
       Width = 49
       Height = 21
       TabOrder = 8
     end
     object ZPosInput: TEdit
       Left = 287
-      Top = 70
+      Top = 57
       Width = 49
       Height = 21
       TabOrder = 9
     end
     object YAngleInput: TEdit
       Left = 408
-      Top = 43
+      Top = 30
       Width = 49
       Height = 21
       TabOrder = 10
     end
     object ZAngleInput: TEdit
       Left = 408
-      Top = 70
+      Top = 57
       Width = 49
       Height = 21
       TabOrder = 11
     end
     object XAngleInput: TEdit
       Left = 408
-      Top = 16
+      Top = 3
       Width = 49
       Height = 21
       TabOrder = 12
     end
     object XAxisBar: TTrackBar
       Left = 463
-      Top = 16
+      Top = 3
       Width = 75
       Height = 21
       Max = 3600
@@ -136,7 +136,7 @@ object AnimationEditorForm: TAnimationEditorForm
     end
     object YAxisBar: TTrackBar
       Left = 463
-      Top = 43
+      Top = 30
       Width = 75
       Height = 21
       Max = 3600
@@ -144,7 +144,7 @@ object AnimationEditorForm: TAnimationEditorForm
     end
     object ZAxisBar: TTrackBar
       Left = 463
-      Top = 70
+      Top = 57
       Width = 75
       Height = 21
       Max = 3600
@@ -170,7 +170,7 @@ object AnimationEditorForm: TAnimationEditorForm
     end
     object TimelinePlaceholder: TPanel
       Left = 544
-      Top = 16
+      Top = 3
       Width = 721
       Height = 89
       BevelOuter = bvNone
@@ -209,6 +209,29 @@ object AnimationEditorForm: TAnimationEditorForm
       Height = 25
       Caption = 'Undo Delete'
       TabOrder = 22
+    end
+    object AnimationLength: TEdit
+      Left = 777
+      Top = 96
+      Width = 33
+      Height = 21
+      TabOrder = 23
+    end
+    object PlayStop: TButton
+      Left = 641
+      Top = 94
+      Width = 75
+      Height = 25
+      Caption = 'Play/Stop'
+      TabOrder = 24
+    end
+    object AnimationLoop: TCheckBox
+      Left = 592
+      Top = 98
+      Width = 41
+      Height = 17
+      Caption = 'Loop'
+      TabOrder = 25
     end
   end
   object OpenGLPanel: TPanel

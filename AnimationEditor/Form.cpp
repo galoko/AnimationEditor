@@ -169,17 +169,37 @@ void Form::ButtonStaticCallback(const wchar_t * Name)
 
 void Form::ButtonCallback(const wstring Name)
 {
-	if (Name == RESET_ROOT_POSITION) {
+	if (!SerializationManager::GetInstance().IsInKinematicMode()) {
 
-		SerializationManager::GetInstance().PushStateFrame(L"Root reset");
+		if (Name == RESET_ROOT_POSITION) {
 
-		Character* Char = CharacterManager::GetInstance().GetCharacter();
+			SerializationManager::GetInstance().PushStateFrame(L"Root reset");
 
-		Char->Position = vec3(0.0f);
-		Char->UpdateWorldTranforms();
-		PhysicsManager::GetInstance().SyncWorldWithCharacter();
+			Character* Char = CharacterManager::GetInstance().GetCharacter();
+
+			Char->Position = vec3(0, 0, Char->Position.z);
+			Char->UpdateWorldTranforms();
+			PhysicsManager::GetInstance().SyncWorldWithCharacter();
+		}
+		else
+		if (Name == DELETE_STATE) {
+
+			int32 HistoryID = SerializationManager::GetInstance().GetCurrentHistoryID();
+			if (HistoryID > 0)
+				SerializationManager::GetInstance().DeleteHistory(HistoryID);
+		}
+		else
+		if (Name == UNDO_DELETE)
+			SerializationManager::GetInstance().UndoLastHistoryDeletion();
+		else
+		if (Name == MIRROR_STATE) {
+
+			SerializationManager::GetInstance().PushStateFrame(L"Mirror");
+
+			PhysicsManager::GetInstance().MirrorCharacter();
+		}
 	}
-	else
+
 	if (Name == CREATE_STATE) {
 
 		int32 HistoryID = SerializationManager::GetInstance().CreateCopyOfCurrentState();
@@ -187,19 +207,11 @@ void Form::ButtonCallback(const wstring Name)
 			SerializationManager::GetInstance().LoadHistoryByID(HistoryID);
 	}
 	else
-	if (Name == DELETE_STATE) {
+	if (Name == PLAY_STOP) {
 
-		int32 HistoryID = SerializationManager::GetInstance().GetCurrentHistoryID();
-		SerializationManager::GetInstance().DeleteHistory(HistoryID);
-	}
-	if (Name == UNDO_DELETE) 
-		SerializationManager::GetInstance().UndoLastHistoryDeletion();
-	else
-	if (Name == MIRROR_STATE) {
+		bool IsPlaying = SerializationManager::GetInstance().IsAnimationPlaying();
 
-		SerializationManager::GetInstance().PushStateFrame(L"Mirror");
-
-		CharacterManager::GetInstance().GetCharacter()->Mirror();
+		SerializationManager::GetInstance().SetAnimationPlayState(!IsPlaying);
 	}
 }
 
@@ -210,38 +222,44 @@ void Form::CheckBoxStaticCallback(const wchar_t* Name, bool IsChecked)
 
 void Form::CheckBoxCallback(const wstring Name, bool IsChecked)
 {
-	if (Name == X_POS || Name == Y_POS || Name == Z_POS || Name == X_AXIS || Name == Y_AXIS || Name == Z_AXIS) {
+	if (!SerializationManager::GetInstance().IsInKinematicMode()) {
 
-		InputSelection Selection = InputManager::GetInstance().GetSelection();
-		if (!Selection.HaveBone())
-			return;
+		if (Name == X_POS || Name == Y_POS || Name == Z_POS || Name == X_AXIS || Name == Y_AXIS || Name == Z_AXIS) {
 
-		SerializationManager::GetInstance().PushStateFrame(L"Set Blocking (" + Name + L")");
+			InputSelection Selection = InputManager::GetInstance().GetSelection();
+			if (!Selection.HaveBone())
+				return;
 
-		Bone* Bone = Selection.Bone;
-		BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Bone);
+			SerializationManager::GetInstance().PushStateFrame(L"Set Blocking (" + Name + L")");
 
-		if (Name == X_POS)
-			Blocking.XPos = IsChecked;
-		else
-		if (Name == Y_POS)
-			Blocking.YPos = IsChecked;
-		else
-		if (Name == Z_POS)
-			Blocking.ZPos = IsChecked;
-		else
-		if (Name == X_AXIS)
-			Blocking.XAxis = IsChecked;
-		else
-		if (Name == Y_AXIS)
-			Blocking.YAxis = IsChecked;
-		else
-		if (Name == Z_AXIS)
-			Blocking.ZAxis = IsChecked;
+			Bone* Bone = Selection.Bone;
+			BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Bone);
 
-		if (Bone != nullptr)
-			AnimationManager::GetInstance().SetBoneBlocking(Bone, Blocking);
+			if (Name == X_POS)
+				Blocking.XPos = IsChecked;
+			else
+			if (Name == Y_POS)
+				Blocking.YPos = IsChecked;
+			else
+			if (Name == Z_POS)
+				Blocking.ZPos = IsChecked;
+			else
+			if (Name == X_AXIS)
+				Blocking.XAxis = IsChecked;
+			else
+			if (Name == Y_AXIS)
+				Blocking.YAxis = IsChecked;
+			else
+			if (Name == Z_AXIS)
+				Blocking.ZAxis = IsChecked;
+
+			if (Bone != nullptr)
+				AnimationManager::GetInstance().SetBoneBlocking(Bone, Blocking);
+		}
 	}
+
+	if (Name == ANIMATION_LOOP) 
+		SerializationManager::GetInstance().SetAnimationPlayLoop(IsChecked);
 }
 
 void Form::EditStaticCallback(const wchar_t* Name, const wchar_t* Text)
@@ -251,66 +269,87 @@ void Form::EditStaticCallback(const wchar_t* Name, const wchar_t* Text)
 
 void Form::EditCallback(const wstring Name, const wstring Text)
 {
-	float Value;
+	if (!SerializationManager::GetInstance().IsInKinematicMode()) {
 
-	try {
-		Value = stof(Text, nullptr);
-	}
-	catch (invalid_argument) {
-		Value = nanf("");
-	}
-	catch (out_of_range) {
-		Value = nanf("");
-	}
+		if (Name == X_ANGLE_INPUT || Name == Y_ANGLE_INPUT || Name == Z_ANGLE_INPUT) {
 
-	if (!isnan(Value) && (Name == X_ANGLE_INPUT || Name == Y_ANGLE_INPUT || Name == Z_ANGLE_INPUT)) {
+			float Value;
 
-		float Angle = radians(Value);
+			try {
+				Value = stof(Text, nullptr);
+			}
+			catch (invalid_argument) {
+				Value = nanf("");
+			}
+			catch (out_of_range) {
+				Value = nanf("");
+			}
 
-		Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
-		if (Bone == nullptr)
-			return;
+			if (!isnan(Value)) {
 
-		SerializationManager::GetInstance().PushStateFrame(L"Set Angle (" + Name + L")");
+				float Angle = radians(Value);
 
-		vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Bone);
+				Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
+				if (Bone == nullptr)
+					return;
 
-		if (Name == X_ANGLE_INPUT)
-			Angles.x = Angle;
-		else
-		if (Name == Y_ANGLE_INPUT)
-			Angles.y = Angle;
-		else
-		if (Name == Z_ANGLE_INPUT)
-			Angles.z = Angle;
+				SerializationManager::GetInstance().PushStateFrame(L"Set Angle (" + Name + L")");
 
-		InputManager::GetInstance().ChangeBoneAngles(Bone, Angles);
-	}
+				vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Bone);
 
-	if (!isnan(Value) && (Name == X_POS_INPUT || Name == Y_POS_INPUT || Name == Z_POS_INPUT)) {
+				if (Name == X_ANGLE_INPUT)
+					Angles.x = Angle;
+				else
+				if (Name == Y_ANGLE_INPUT)
+					Angles.y = Angle;
+				else
+				if (Name == Z_ANGLE_INPUT)
+					Angles.z = Angle;
 
-		float Position = Value / 100.0f; // to meters
+				InputManager::GetInstance().ChangeBoneAngles(Bone, Angles);
+			}
+		}
 
-		Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
-		if (Bone == nullptr)
-			return;
+		if (Name == X_POS_INPUT || Name == Y_POS_INPUT || Name == Z_POS_INPUT) {
 
-		SerializationManager::GetInstance().PushStateFrame(L"Set Position (" + Name + L")");
+			float Value;
 
-		vec3 LocalPoint = Bone->Tail * Bone->Size;
+			try {
+				Value = stof(Text, nullptr);
+			}
+			catch (invalid_argument) {
+				Value = nanf("");
+			}
+			catch (out_of_range) {
+				Value = nanf("");
+			}
 
-		vec3 BonePosition = Bone->WorldTransform * vec4(LocalPoint, 1);
+			if (!isnan(Value)) {
 
-		if (Name == X_POS_INPUT)
-			BonePosition.x = Position;
-		else
-		if (Name == Y_POS_INPUT)
-			BonePosition.y = Position;
-		else
-		if (Name == Z_POS_INPUT)
-			BonePosition.z = Position;
+				float Position = Value / 100.0f; // to meters
 
-		InputManager::GetInstance().SetupInverseKinematic(Bone, inverse(Bone->MiddleTranslation) * vec4(LocalPoint, 1), BonePosition, true);
+				Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
+				if (Bone == nullptr)
+					return;
+
+				SerializationManager::GetInstance().PushStateFrame(L"Set Position (" + Name + L")");
+
+				vec3 LocalPoint = Bone->Tail * Bone->Size;
+
+				vec3 BonePosition = Bone->WorldTransform * vec4(LocalPoint, 1);
+
+				if (Name == X_POS_INPUT)
+					BonePosition.x = Position;
+				else
+				if (Name == Y_POS_INPUT)
+					BonePosition.y = Position;
+				else
+				if (Name == Z_POS_INPUT)
+					BonePosition.z = Position;
+
+				InputManager::GetInstance().SetupInverseKinematic(Bone, inverse(Bone->MiddleTranslation) * vec4(LocalPoint, 1), BonePosition, true);
+			}
+		}
 	}
 
 	if (Name == OPEN_DIALOG)
@@ -322,6 +361,23 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 
 		SerializationManager::GetInstance().SaveToFile(Text);
 	}
+	else
+	if (Name == ANIMATION_LENGTH) {
+
+		float Value;
+
+		try {
+			Value = stof(Text, nullptr);
+		}
+		catch (invalid_argument) {
+			Value = nanf("");
+		}
+		catch (out_of_range) {
+			Value = nanf("");
+		}
+
+		SerializationManager::GetInstance().SetAnimationLength(Value);
+	}
 }
 
 void Form::TrackBarStaticCallback(const wchar_t* Name, float t)
@@ -331,45 +387,52 @@ void Form::TrackBarStaticCallback(const wchar_t* Name, float t)
 
 void Form::TrackBarCallback(const wstring Name, float t)
 {
-	if (Name == X_AXIS_BAR || Name == Y_AXIS_BAR || Name == Z_AXIS_BAR) {
+	if (!SerializationManager::GetInstance().IsInKinematicMode()) {
 
-		Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
-		if (Bone == nullptr)
-			return;
+		if (Name == X_AXIS_BAR || Name == Y_AXIS_BAR || Name == Z_AXIS_BAR) {
 
-		SerializationManager::GetInstance().PushPendingStateFrame(PendingAnglesTrackBar, L"TrackBarCallback");
+			Bone* Bone = InputManager::GetInstance().GetSelection().Bone;
+			if (Bone == nullptr)
+				return;
 
-		vec3 LowLimit = Bone->LowLimit;
-		vec3 HighLimit = Bone->HighLimit;
+			SerializationManager::GetInstance().PushPendingStateFrame(PendingAnglesTrackBar, L"TrackBarCallback");
 
-		vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Bone);
+			vec3 LowLimit = Bone->LowLimit;
+			vec3 HighLimit = Bone->HighLimit;
 
-		if (Name == X_AXIS_BAR)
-			Angles.x = LowLimit.x + (HighLimit.x - LowLimit.x) * t;
-		else
-		if (Name == Y_AXIS_BAR)
-			Angles.y = LowLimit.y + (HighLimit.y - LowLimit.y) * t;
-		else
-		if (Name == Z_AXIS_BAR)
-			Angles.z = LowLimit.z + (HighLimit.z - LowLimit.z) * t;
+			vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Bone);
 
-		InputManager::GetInstance().ChangeBoneAngles(Bone, Angles);
+			if (Name == X_AXIS_BAR)
+				Angles.x = LowLimit.x + (HighLimit.x - LowLimit.x) * t;
+			else
+			if (Name == Y_AXIS_BAR)
+				Angles.y = LowLimit.y + (HighLimit.y - LowLimit.y) * t;
+			else
+			if (Name == Z_AXIS_BAR)
+				Angles.z = LowLimit.z + (HighLimit.z - LowLimit.z) * t;
+
+			InputManager::GetInstance().ChangeBoneAngles(Bone, Angles);
+		}
 	}
 }
 
-void Form::TimelineStaticCallback(float Position, int32 SelectedID, TimelineItem* Items, int32 ItemsCount)
+void Form::TimelineStaticCallback(float Position, float Length, int32 SelectedID, TimelineItem* Items, int32 ItemsCount)
 {
 	vector<TimelineItem> ItemsVector;
 	for (int Index = 0; Index < ItemsCount; Index++)
 		ItemsVector.push_back(Items[Index]);
 
-	Form::GetInstance().TimelineCallback(Position, SelectedID, ItemsVector);
+	Form::GetInstance().TimelineCallback(Position, Length, SelectedID, ItemsVector);
 }
 
-void Form::TimelineCallback(float Position, int32 SelectedID, vector<TimelineItem> Items)
+void Form::TimelineCallback(float Position, float Length, int32 SelectedID, vector<TimelineItem> Items)
 {
+	Form::UpdateLock Lock;
+
 	SerializationManager::GetInstance().SetTimelineItems(Items);
-	AnimationManager::GetInstance().SetAnimationState(Position, SelectedID);
+	SerializationManager::GetInstance().SetAnimationLength(Length);
+	SerializationManager::GetInstance().SetAnimationPosition(Position);
+	SerializationManager::GetInstance().SetCurrentHistoryByID(SelectedID);
 }
 
 void Form::UpdateBlocking(void)
@@ -377,7 +440,7 @@ void Form::UpdateBlocking(void)
 	CheckFormUpdateBlock(IsBlockingUpdatePending);
 
 	InputSelection Selection = InputManager::GetInstance().GetSelection();
-	if (!Selection.HaveBone()) {
+	if (!Selection.HaveBone() || SerializationManager::GetInstance().IsInKinematicMode()) {
 
 		aegSetEnabled(X_POS,  false);
 		aegSetEnabled(Y_POS,  false);
@@ -449,7 +512,7 @@ void Form::UpdatePositionAndAngles(void)
 	CheckFormUpdateBlock(IsPositionsAndAnglesUpdatePending);
 
 	InputSelection Selection = InputManager::GetInstance().GetSelection();
-	if (!Selection.HaveBone()) {
+	if (!Selection.HaveBone() || SerializationManager::GetInstance().IsInKinematicMode()) {
 
 		aegSetEnabled(X_POS_INPUT, false);
 		aegSetEnabled(Y_POS_INPUT, false);
@@ -547,12 +610,18 @@ void Form::UpdateTimeline(void)
 {
 	CheckFormUpdateBlock(IsTimelineUpdatePending);
 
-	float Position = AnimationManager::GetInstance().GetAnimationPosition();
-	int32 SelectedID = AnimationManager::GetInstance().IsInKinematicMode() ? 0 : SerializationManager::GetInstance().GetCurrentHistoryID();
+	float Position = SerializationManager::GetInstance().GetAnimationPosition();
+	float Length = SerializationManager::GetInstance().GetAnimationLength();
+	int32 SelectedID = SerializationManager::GetInstance().GetCurrentHistoryID();
+	bool IsLooped = SerializationManager::GetInstance().IsAnimationLooped();
 
 	vector<TimelineItem> Items = SerializationManager::GetInstance().GetTimelineItems();
 
-	aegSetTimelineState(Position, SelectedID, Items.data(), (uint32)Items.size());
+	aegSetTimelineState(Position, Length, SelectedID, Items.data(), (uint32)Items.size());
+
+	aegSetText(ANIMATION_LENGTH, f2ws(Length, 2).c_str());
+
+	aegSetChecked(ANIMATION_LOOP, IsLooped);
 }
 
 void Form::FullUpdate(void)
