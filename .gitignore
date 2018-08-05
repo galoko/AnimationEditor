@@ -260,6 +260,9 @@ paket-files/
 __pycache__/
 *.pyc
 /AnimationEditor/AnimationEditorGUI.dll
+/AnimationEditor/AnimationEditorGUI.map
+/AnimationEditor/AnimationEditorGUI.drc
+/AnimationEditor/AnimationEditorGUI.rsm
 /AnimationEditor/Settings.xml
 /AnimationEditor/Settings.backup
 *.dcu
