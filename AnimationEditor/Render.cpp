@@ -60,19 +60,19 @@ void Render::DrawCharacter(Character* Char, bool IsKinematic) {
 		else 
 			Color = { 0.7, 0.7, 0.7, 1 };
 
-		if (!IsKinematic && AnimationManager::GetInstance().GetBoneBlocking(Bone).IsFullyBlocked())
+		if (!IsKinematic && PoseManager::GetInstance().GetBoneBlocking(Bone).IsFullyBlocked())
 			Color = vec4(vec3(Color) * 0.36f, 1);
 	
 		SetColors(Color);
 
 		DrawCube(Bone->WorldTransform * Bone->MiddleTranslation, Bone->Size);
 
-		if (!IsKinematic && Bone->AnimCtx->Pinpoint.IsActive()) {
+		if (!IsKinematic && Bone->PoseCtx->Pinpoint.IsActive()) {
 
 			SetWireframeMode(true);
 			SetColors({ 0, 0, 1, 0.7 });
 
-			DrawSphere(Bone->AnimCtx->Pinpoint.DestWorldPoint, mat4(1.0f), vec3(0.04f));
+			DrawSphere(Bone->PoseCtx->Pinpoint.DestWorldPoint, mat4(1.0f), vec3(0.04f));
 
 			SetWireframeMode(false);
 		}
@@ -560,7 +560,7 @@ void Render::UpdateViewMatrix(void)
 	CameraAngleZ -= (float)(long)CameraAngleZ;
 	CameraAngleZ *= (float)M_PI * 2.0f;
 
-	CameraAngleX = min(max(0.1f, CameraAngleX), 3.13f);
+	CameraAngleX = std::min(std::max(0.1f, CameraAngleX), 3.13f);
 
 	vec3 Direction = GetLookingDirection();
 

@@ -88,7 +88,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	Render::GetInstance().Initialize(WindowHandle);
 	PhysicsManager::GetInstance().Initialize();
-	AnimationManager::GetInstance().Initialize();
+	PoseManager::GetInstance().Initialize();
 
 	SerializationManager::GetInstance().Initialize(WorkingDirectory);
 

@@ -11,11 +11,14 @@
 
 #include <tinyxml2.h>
 
+#include "blockingconcurrentqueue.h"
+
 #include "ExternalGUI.hpp"
 
 using namespace std;
 using namespace glm;
 using namespace tinyxml2;
+using namespace moodycamel;
 
 typedef struct SerializedBone {
 	wstring Name;
@@ -48,20 +51,20 @@ typedef struct SerializedBlockingInfo {
 	bool XAxis, YAxis, ZAxis, XPos, YPos, ZPos;
 } SerializedBlockingInfo;
 
-typedef struct SerializedAnimationContext {
+typedef struct SerializedPoseContext {
 	wstring BoneName;
 	SerializedBlockingInfo Blocking;
 	// pin point
 	bool IsActive;
 	vec3 SrcLocalPoint, DestWorldPoint;
-} SerializedAnimationContext;
+} SerializedPoseContext;
 
-typedef struct AnimationSerializedState {
-	vector<SerializedAnimationContext> Contexts;
+typedef struct PoseSerializedState {
+	vector<SerializedPoseContext> Contexts;
 
 	void SaveToXML(XMLDocument& Document, XMLNode *Root);
 	bool LoadFromXML(XMLDocument& Document, XMLNode *Root);
-} AnimationSerializedState;
+} PoseSerializedState;
 
 typedef struct RenderSerializedState {
 	vec3 CameraPosition;
@@ -72,7 +75,7 @@ typedef struct RenderSerializedState {
 } RenderSerializedState;
 
 typedef struct SerializeSerializedState {
-	float AnimationPosition, AnimationLength;
+	float AnimationPosition, AnimationLength, PlaySpeed;
 	bool KinematicModeFlag, PlayAnimaionFlag, LoopAnimationFlag;
 
 	void SaveToXML(XMLDocument& Document, XMLNode *Root);
@@ -91,10 +94,10 @@ typedef struct SingleSerializedState {
 
 	CharacterSerializedState CharState;
 	InputSerializedState InputState;
-	AnimationSerializedState AnimationState;
+	PoseSerializedState PoseState;
 	RenderSerializedState RenderState;
 
-	bool HaveCharState, HaveInputState, HaveAnimationState, HaveRenderState;
+	bool HaveCharState, HaveInputState, HavePoseState, HaveRenderState;
 } SingleSerializedState;
 
 typedef struct SerializedStateHistory {
@@ -119,8 +122,17 @@ private:
 
 	wstring SettingsFileName;
 
-	float AnimationPosition, AnimationLength;
+	float AnimationPosition, AnimationLength, PlaySpeed;
 	bool KinematicModeFlag, PlayAnimaionFlag, LoopAnimationFlag;
+
+	typedef struct FileSaveRequest {
+		vector<SerializedStateHistory> Histories;
+		SerializeSerializedState State;
+
+		wstring FileName;
+	} FileSaveRequest;
+
+	BlockingConcurrentQueue<FileSaveRequest*> DelayedFileSaveRequests;
 
 	SerializationManager(void) { };
 
@@ -158,6 +170,11 @@ private:
 	void ProcessAnimaiton(void);
 
 	void SafeSaveDocumentToFile(XMLDocument& Document, const wstring FileName, int BackupCount);
+
+	void StartBackgroundThread(void);
+	static DWORD WINAPI BackgroundStaticThreadProc(LPVOID lpThreadParameter);
+	void BackgroundThreadProc(void);
+	void ExecuteFileSaveRequest(FileSaveRequest& Request);
 public:
 	static SerializationManager& GetInstance(void) {
 		static SerializationManager Instance;
@@ -171,9 +188,9 @@ public:
 	void Initialize(const wstring WorkingDirectory);
 
 	void LoadFromFile(wstring FileName);
-	void SaveToFile(wstring FileName);
+	void SaveToFile(wstring FileName, bool Delay);
 
-	void Autosave(void);
+	void Autosave(bool Delay = true);
 
 	void Tick(double dt);
 
@@ -213,4 +230,6 @@ public:
 	bool IsAnimationPlaying(void);
 	void SetAnimationPlayLoop(bool LoopAnimation);
 	bool IsAnimationLooped(void);
+	float GetAnimationPlaySpeed(void);
+	void SetAnimationPlaySpeed(float Speed);
 } SerializationManager;

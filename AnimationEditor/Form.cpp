@@ -63,7 +63,7 @@ void Form::Tick(double dt) {
 
 	InputManager::GetInstance().Tick(dt);
 
-	AnimationManager::GetInstance().Tick(dt);
+	PoseManager::GetInstance().Tick(dt);
 
 	SerializationManager::GetInstance().Tick(dt);
 
@@ -150,7 +150,7 @@ LRESULT CALLBACK Form::WndProcCallback(HWND hWnd, UINT message, WPARAM wParam, L
 	}
 	case WM_DESTROY: {
 
-		SerializationManager::GetInstance().Autosave();
+		SerializationManager::GetInstance().Autosave(false);
 
 		PostQuitMessage(0);
 		break;
@@ -233,7 +233,7 @@ void Form::CheckBoxCallback(const wstring Name, bool IsChecked)
 			SerializationManager::GetInstance().PushStateFrame(L"Set Blocking (" + Name + L")");
 
 			Bone* Bone = Selection.Bone;
-			BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Bone);
+			BlockingInfo Blocking = PoseManager::GetInstance().GetBoneBlocking(Bone);
 
 			if (Name == X_POS)
 				Blocking.XPos = IsChecked;
@@ -254,7 +254,7 @@ void Form::CheckBoxCallback(const wstring Name, bool IsChecked)
 				Blocking.ZAxis = IsChecked;
 
 			if (Bone != nullptr)
-				AnimationManager::GetInstance().SetBoneBlocking(Bone, Blocking);
+				PoseManager::GetInstance().SetBoneBlocking(Bone, Blocking);
 		}
 	}
 
@@ -359,10 +359,10 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 
 		SerializationManager::GetInstance().CreateNewFile();
 
-		SerializationManager::GetInstance().SaveToFile(Text);
+		SerializationManager::GetInstance().SaveToFile(Text, false);
 	}
 	else
-	if (Name == ANIMATION_LENGTH) {
+	if (Name == ANIMATION_LENGTH || Name == PLAY_SPEED) {
 
 		float Value;
 
@@ -376,7 +376,11 @@ void Form::EditCallback(const wstring Name, const wstring Text)
 			Value = nanf("");
 		}
 
-		SerializationManager::GetInstance().SetAnimationLength(Value);
+		if (Name == ANIMATION_LENGTH)
+			SerializationManager::GetInstance().SetAnimationLength(Value);
+		else
+		if (Name == PLAY_SPEED)
+			SerializationManager::GetInstance().SetAnimationPlaySpeed(Value);
 	}
 }
 
@@ -431,7 +435,12 @@ void Form::TimelineCallback(float Position, float Length, int32 SelectedID, vect
 
 	SerializationManager::GetInstance().SetTimelineItems(Items);
 	SerializationManager::GetInstance().SetAnimationLength(Length);
-	SerializationManager::GetInstance().SetAnimationPosition(Position);
+
+	if (fabs(SerializationManager::GetInstance().GetAnimationPosition() - Position) > 0.001) {
+		SerializationManager::GetInstance().PushPendingStateFrame(PendingAnimationState, L"Timeline callback");
+		SerializationManager::GetInstance().SetAnimationPosition(Position);
+	}
+
 	SerializationManager::GetInstance().SetCurrentHistoryByID(SelectedID);
 }
 
@@ -459,7 +468,7 @@ void Form::UpdateBlocking(void)
 		return;
 	}
 
-	BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
+	BlockingInfo Blocking = PoseManager::GetInstance().GetBoneBlocking(Selection.Bone);
 	vec3 Angles = PhysicsManager::GetInstance().GetBoneAngles(Selection.Bone);
 
 	aegSetEnabled(X_POS, true);
@@ -614,6 +623,7 @@ void Form::UpdateTimeline(void)
 	float Length = SerializationManager::GetInstance().GetAnimationLength();
 	int32 SelectedID = SerializationManager::GetInstance().GetCurrentHistoryID();
 	bool IsLooped = SerializationManager::GetInstance().IsAnimationLooped();
+	float Speed = SerializationManager::GetInstance().GetAnimationPlaySpeed();
 
 	vector<TimelineItem> Items = SerializationManager::GetInstance().GetTimelineItems();
 
@@ -622,6 +632,8 @@ void Form::UpdateTimeline(void)
 	aegSetText(ANIMATION_LENGTH, f2ws(Length, 2).c_str());
 
 	aegSetChecked(ANIMATION_LOOP, IsLooped);
+
+	aegSetText(PLAY_SPEED, f2ws(Speed, 2).c_str());
 }
 
 void Form::FullUpdate(void)

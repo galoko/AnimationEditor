@@ -31,7 +31,7 @@ void InputManager::Tick(double dt) {
 	ProcessKeyboardInput(dt);
 
 	if (IsStateInverseKinematic(State) && Selection.HaveBone())
-		AnimationManager::GetInstance().InverseKinematic(Selection.Bone, Selection.LocalPoint, Selection.GetWorldPoint());
+		PoseManager::GetInstance().InverseKinematic(Selection.Bone, Selection.LocalPoint, Selection.GetWorldPoint());
 }
 
 void InputManager::SetFocus(bool IsInFocusNow) {
@@ -105,7 +105,7 @@ void InputManager::SetState(InputState NewState)
 		SetCursorToWorldPoint(Selection.GetWorldPoint());
 
 	if (IsStateInverseKinematic(State) && !IsStateInverseKinematic(NewState))
-		AnimationManager::GetInstance().CancelInverseKinematic();
+		PoseManager::GetInstance().CancelInverseKinematic();
 
 	State = NewState;
 }
@@ -151,7 +151,7 @@ void InputManager::CancelSelection(void) {
 	Selection.Bone = nullptr;
 
 	if (IsStateInverseKinematic(State))
-		AnimationManager::GetInstance().CancelInverseKinematic();
+		PoseManager::GetInstance().CancelInverseKinematic();
 
 	Form::GetInstance().UpdateBlocking();
 	Form::GetInstance().UpdatePositionAndAngles();
@@ -331,16 +331,16 @@ void InputManager::ProcessKeyboardInput(double dt) {
 
 			if (!IsPressed(VK_LCONTROL)) {
 
-				BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
+				BlockingInfo Blocking = PoseManager::GetInstance().GetBoneBlocking(Selection.Bone);
 				if (Blocking.IsFullyBlocked())
 					Blocking = BlockingInfo::GetAllUnblocked();
 				else
 					Blocking = BlockingInfo::GetAllBlocked();
 
-				AnimationManager::GetInstance().SetBoneBlocking(Selection.Bone, Blocking);
+				PoseManager::GetInstance().SetBoneBlocking(Selection.Bone, Blocking);
 			}
 			else
-				AnimationManager::GetInstance().BlockEverythingExceptThisBranch(Selection.Bone->Parent, Selection.Bone);
+				PoseManager::GetInstance().BlockEverythingExceptThisBranch(Selection.Bone->Parent, Selection.Bone);
 		}
 
 		if (IsPressed(VK_LCONTROL)) {
@@ -362,10 +362,10 @@ void InputManager::ProcessKeyboardInput(double dt) {
 
 				SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput R");
 
-				if (!AnimationManager::GetInstance().IsBonePositionConstrained(Selection.Bone))
-					AnimationManager::GetInstance().ConstrainBonePosition(Selection.Bone, Selection.GetWorldPoint());
+				if (!PoseManager::GetInstance().IsBonePositionConstrained(Selection.Bone))
+					PoseManager::GetInstance().ConstrainBonePosition(Selection.Bone, Selection.GetWorldPoint());
 				else
-					AnimationManager::GetInstance().RemoveBonePositionConstraint(Selection.Bone);
+					PoseManager::GetInstance().RemoveBonePositionConstraint(Selection.Bone);
 			}
 		}
 
@@ -390,20 +390,20 @@ void InputManager::ProcessKeyboardInput(double dt) {
 
 			SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput P");
 
-			AnimationManager::GetInstance().UnblockAllBones();
+			PoseManager::GetInstance().UnblockAllBones();
 		}
 
 		if (WasPressed('K') && Selection.HaveBone()) {
 
 			SerializationManager::GetInstance().PushStateFrame(L"ProcessKeyboardInput K");
 
-			BlockingInfo Blocking = AnimationManager::GetInstance().GetBoneBlocking(Selection.Bone);
+			BlockingInfo Blocking = PoseManager::GetInstance().GetBoneBlocking(Selection.Bone);
 
 			Blocking.XAxis = !Blocking.XAxis;
 			Blocking.YAxis = !Blocking.YAxis;
 			Blocking.ZAxis = !Blocking.ZAxis;
 
-			AnimationManager::GetInstance().SetBoneBlocking(Selection.Bone, Blocking);
+			PoseManager::GetInstance().SetBoneBlocking(Selection.Bone, Blocking);
 		}
 
 		if (!IsPressed(VK_CONTROL) && (WasPressed('Z') || WasPressed('X') || WasPressed('C') || WasPressed('V'))) {
@@ -523,8 +523,10 @@ void InputManager::Deserialize(InputSerializedState& State)
 	Selection.LocalPoint = State.LocalPoint;
 	Selection.SetWorldPoint(State.WorldPoint);
 
-	if (Selection.HaveBone())
+	if (Selection.HaveBone()) {
+
 		SetState((InputState)State.State);
+	}
 	else
 		SetState(None);
 }
@@ -565,9 +567,9 @@ void InputSelection::SetWorldPoint(vec3 WorldPoint)
 {
 	const float BoxSize = 3.0f;
 
-	WorldPoint.x = max(-BoxSize, min(WorldPoint.x, BoxSize));
-	WorldPoint.y = max(-BoxSize, min(WorldPoint.y, BoxSize));
-	WorldPoint.z = max(-BoxSize, min(WorldPoint.z, BoxSize));
+	WorldPoint.x = std::max(-BoxSize, std::min(WorldPoint.x, BoxSize));
+	WorldPoint.y = std::max(-BoxSize, std::min(WorldPoint.y, BoxSize));
+	WorldPoint.z = std::max(-BoxSize, std::min(WorldPoint.z, BoxSize));
 
 	this->WorldPoint = WorldPoint;
 }

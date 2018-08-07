@@ -21,30 +21,30 @@ typedef struct BlockingInfo {
 	static BlockingInfo GetAllUnblocked(void);
 } BlockingInfo;
 
-typedef struct AnimationContext {
-	friend class AnimationManager;
+typedef struct PoseContext {
+	friend class PoseManager;
 private:
 	BlockingInfo Blocking;
 public:
 	PhysicsManager::Pinpoint Pinpoint;
-} AnimationContext;
+} PoseContext;
 
-typedef class AnimationManager {
+typedef class PoseManager {
 private:
-	AnimationManager(void) { };
+	PoseManager(void) { };
 
 	PhysicsManager::Pinpoint IKPinpoint;
 
 	void PhysicsPreSolve(void);
 public:
-	static AnimationManager& GetInstance(void) {
-		static AnimationManager Instance;
+	static PoseManager& GetInstance(void) {
+		static PoseManager Instance;
 
 		return Instance;
 	}
 
-	AnimationManager(AnimationManager const&) = delete;
-	void operator=(AnimationManager const&) = delete;
+	PoseManager(PoseManager const&) = delete;
+	void operator=(PoseManager const&) = delete;
 
 	void Initialize(void);
 	void Tick(double dt);
@@ -62,6 +62,6 @@ public:
 	void BlockEverythingExceptThisBranch(Bone* Parent, Bone* Exception);
 	void UnblockAllBones(void);
 
-	void Serialize(AnimationSerializedState& State);
-	void Deserialize(AnimationSerializedState& State);
-} AnimationManager;
+	void Serialize(PoseSerializedState& State);
+	void Deserialize(PoseSerializedState& State);
+} PoseManager;

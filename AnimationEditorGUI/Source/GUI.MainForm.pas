@@ -43,6 +43,7 @@ type
     AnimationLength: TEdit;
     PlayStop: TButton;
     AnimationLoop: TCheckBox;
+    PlaySpeed: TEdit;
     procedure ApplicationEventsMessage(var Msg: tagMSG; var Handled: Boolean);
     procedure FormCreate(Sender: TObject);
     procedure ButtonClick(Sender: TObject);

@@ -10,7 +10,7 @@
 using namespace std;
 using namespace glm;
 
-struct AnimationContext;
+struct PoseContext;
 
 typedef class Bone {
 private:
@@ -45,7 +45,7 @@ public:
 	btRigidBody* PhysicBody;
 	btTypedConstraint* PhysicConstraint;
 
-	AnimationContext* AnimCtx;
+	PoseContext* PoseCtx;
 
 	bool IsFixed(void);
 	bool IsOnlyXRotation(void);

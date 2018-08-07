@@ -233,6 +233,13 @@ object AnimationEditorForm: TAnimationEditorForm
       Caption = 'Loop'
       TabOrder = 25
     end
+    object PlaySpeed: TEdit
+      Left = 727
+      Top = 96
+      Width = 33
+      Height = 21
+      TabOrder = 26
+    end
   end
   object OpenGLPanel: TPanel
     Left = 0

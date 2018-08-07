@@ -34,7 +34,8 @@ void UnloadExternalGUI(void);
 #define MIRROR_STATE        L"MirrorState"
 #define ANIMATION_LENGTH    L"AnimationLength"
 #define PLAY_STOP           L"PlayStop"
-#define ANIMATION_LOOP      L"AnimationLoop"	 
+#define ANIMATION_LOOP      L"AnimationLoop"
+#define PLAY_SPEED			L"PlaySpeed"
 
 typedef struct TimelineItem {
 	int32 ID;

@@ -33,8 +33,10 @@
     <ClCompile Include="texture.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="blockingconcurrentqueue.h" />
     <ClInclude Include="Character.hpp" />
     <ClInclude Include="CharacterManager.hpp" />
+    <ClInclude Include="concurrentqueue.h" />
     <ClInclude Include="ExternalGUI.hpp" />
     <ClInclude Include="Form.hpp" />
     <ClInclude Include="InputManager.hpp" />

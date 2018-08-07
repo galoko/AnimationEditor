@@ -19,6 +19,8 @@ void SerializationManager::Initialize(const wstring WorkingDirectory)
 	NextStateHistoryID = 1;
 
 	LoadSettings();
+
+	StartBackgroundThread();
 }
 
 void SerializationManager::Serialize(void)
@@ -34,8 +36,8 @@ void SerializationManager::Serialize(void)
 	if (State.HaveInputState)
 		InputManager::GetInstance().Serialize(State.InputState);
 
-	if (State.HaveAnimationState)
-		AnimationManager::GetInstance().Serialize(State.AnimationState);
+	if (State.HavePoseState)
+		PoseManager::GetInstance().Serialize(State.PoseState);
 
 	if (State.HaveRenderState)
 		Render::GetInstance().Serialize(State.RenderState);
@@ -59,8 +61,8 @@ void SerializationManager::Deserialize(void)
 	if (State.HaveInputState)
 		InputManager::GetInstance().Deserialize(State.InputState);
 
-	if (State.HaveAnimationState)
-		AnimationManager::GetInstance().Deserialize(State.AnimationState);
+	if (State.HavePoseState)
+		PoseManager::GetInstance().Deserialize(State.PoseState);
 }
 
 void SerializationManager::Serialize(SerializeSerializedState& State)
@@ -70,6 +72,7 @@ void SerializationManager::Serialize(SerializeSerializedState& State)
 	State.KinematicModeFlag = this->IsInKinematicMode();
 	State.PlayAnimaionFlag = this->IsAnimationPlaying();
 	State.LoopAnimationFlag = this->IsAnimationLooped();
+	State.PlaySpeed = this->GetAnimationPlaySpeed();
 }
 
 void SerializationManager::Deserialize(SerializeSerializedState & State)
@@ -80,6 +83,7 @@ void SerializationManager::Deserialize(SerializeSerializedState & State)
 	SetAnimationLength(State.AnimationLength);
 	SetAnimationPlayState(State.PlayAnimaionFlag);
 	SetAnimationPlayLoop(State.LoopAnimationFlag);
+	SetAnimationPlaySpeed(State.PlaySpeed);
 	
 	if (State.KinematicModeFlag)
 		SetupKinematicMode();
@@ -89,10 +93,10 @@ void SerializationManager::Deserialize(SerializeSerializedState & State)
 	Form::GetInstance().UpdateTimeline();
 }
 
-void SerializationManager::Autosave(void)
+void SerializationManager::Autosave(bool Delay)
 {
 	if (IsFileOpen())
-		SaveToFile(LastFileName);
+		SaveToFile(LastFileName, Delay);
 }
 
 void SerializationManager::Tick(double dt)
@@ -105,16 +109,29 @@ void SerializationManager::Tick(double dt)
 
 		float Len = GetAnimationLength();
 
-		float NewPosition = GetAnimationPosition() + (float)dt;
-		if (IsAnimationLooped())
+		float NewPosition = GetAnimationPosition() + (float)dt * PlaySpeed;
+		if (IsAnimationLooped()) {
 			NewPosition = fmod(NewPosition, Len);
+			if (NewPosition < 0)
+				NewPosition += Len;
+		}
 		else
-			NewPosition = std::min(NewPosition, Len);
+			NewPosition = clamp(NewPosition, 0.0f, Len);
 
 		SetAnimationPosition(NewPosition);
 
-		if (GetAnimationPosition() >= Len)
-			SetAnimationPlayState(false);
+		if (!IsAnimationLooped()) {
+
+			bool IsEnded;
+
+			if (PlaySpeed > 0)
+				IsEnded = GetAnimationPosition() >= Len;
+			else
+				IsEnded = GetAnimationPosition() <= 0;
+
+			if (IsEnded)
+				SetAnimationPlayState(false);
+		}
 	}
 }
 
@@ -128,7 +145,7 @@ void SerializationManager::InternalPushStateFrame(bool Forward)
 	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
 	State.HaveCharState = true;
 	State.HaveInputState = true;
-	State.HaveAnimationState = true;
+	State.HavePoseState = true;
 	State.HaveRenderState = false;
 	Serialize();
 
@@ -178,7 +195,7 @@ void SerializationManager::CreateNewHistory(void)
 	CharacterManager::GetInstance().Serialize(History.CurrentState.CharState);
 	History.CurrentState.HaveCharState = true;
 	History.CurrentState.HaveInputState = true;
-	History.CurrentState.HaveAnimationState = true;
+	History.CurrentState.HavePoseState = true;
 	History.CurrentState.HaveRenderState = false;
 
 	Histories.push_back(History);
@@ -196,7 +213,7 @@ int32 SerializationManager::CreateCopyOfCurrentState(void)
 	SingleSerializedState& State = GetCurrentHistory()->CurrentState;
 	State.HaveCharState = true;
 	State.HaveInputState = true;
-	State.HaveAnimationState = true;
+	State.HavePoseState = true;
 	State.HaveRenderState = false;
 	Serialize();
 
@@ -216,16 +233,26 @@ int32 SerializationManager::CreateCopyOfCurrentState(void)
 
 bool SerializationManager::LoadHistoryByID(int32 ID)
 {
-	if (HaveCurrentHistory() && GetCurrentHistoryID() == ID)
+	if (GetLatestHistory()->ID == ID)
 		return true;
 
-	auto CurrentHistory = GetCurrentHistory();
+	auto LatestHistory = GetLatestHistory();
 
 	auto NextHistory = GetHistoryByID(ID);
 	if (NextHistory == Histories.end())
 		return false;
 
-	iter_swap(CurrentHistory, NextHistory);
+	if (HaveCurrentHistory()) {
+
+		auto State = GetCurrentHistory();
+		State->CurrentState.HaveCharState = true;
+		State->CurrentState.HaveInputState = true;
+		State->CurrentState.HavePoseState = true;
+		State->CurrentState.HaveRenderState = false;
+		Serialize();
+	}
+
+	iter_swap(LatestHistory, NextHistory);
 
 	ReloadCurrentHistory();
 
@@ -340,7 +367,7 @@ void SerializationManager::SetupKinematicMode(void)
 	auto State = GetCurrentHistory();
 	State->CurrentState.HaveCharState = true;
 	State->CurrentState.HaveInputState = true;
-	State->CurrentState.HaveAnimationState = true;
+	State->CurrentState.HavePoseState = true;
 	State->CurrentState.HaveRenderState = true;
 	Serialize();
 
@@ -438,6 +465,52 @@ void SerializationManager::SafeSaveDocumentToFile(XMLDocument& Document, const w
 
 	if (!Result)
 		printf("Failed to rename tmp file\n");
+}
+
+void SerializationManager::StartBackgroundThread(void)
+{
+	HANDLE BackgroundThreadHandle = CreateThread(NULL, 0, BackgroundStaticThreadProc, nullptr, 0, nullptr);
+	if (BackgroundThreadHandle == 0)
+		printf("Failed to create a thread\n");
+}
+
+DWORD SerializationManager::BackgroundStaticThreadProc(LPVOID lpThreadParameter)
+{
+	SerializationManager::GetInstance().BackgroundThreadProc();
+	return 0;
+}
+
+void SerializationManager::BackgroundThreadProc(void)
+{
+	while (true) {
+
+		FileSaveRequest* Request;
+		DelayedFileSaveRequests.wait_dequeue(Request);
+
+		ExecuteFileSaveRequest(*Request);
+
+		delete Request;
+	}
+}
+
+void SerializationManager::ExecuteFileSaveRequest(FileSaveRequest& Request)
+{
+	XMLDocument Document;
+
+	XMLNode* Root = Document.NewElement("Root");
+	Document.InsertFirstChild(Root);
+
+	for (SerializedStateHistory& States : Request.Histories) {
+
+		XMLElement* StatesElement = Document.NewElement("States");
+		Root->InsertEndChild(StatesElement);
+
+		SaveStates(States, Document, StatesElement);
+	}
+
+	Request.State.SaveToXML(Document, Root);
+
+	SafeSaveDocumentToFile(Document, Request.FileName, MaxBackupCount);
 }
 
 void SerializationManager::PushStateFrame(const wstring Sender)
@@ -656,8 +729,27 @@ void SerializationManager::SetAnimationPlayState(bool PlayAnimation)
 {
 	PlayAnimaionFlag = PlayAnimation;
 
-	if (PlayAnimaionFlag)
+	if (IsAnimationPlaying()) {
+
 		SetupKinematicMode();
+
+		if (!IsAnimationLooped()) {
+
+			float Pos = GetAnimationPosition();
+			float Len = GetAnimationLength();
+
+			if (PlaySpeed > 0) {
+
+				if (Pos >= Len)
+					SetAnimationPosition(0.0f);
+			}
+			else {
+
+				if (Pos <= 0)
+					SetAnimationPosition(Len);
+			}
+		}
+	}
 }
 
 bool SerializationManager::IsAnimationPlaying(void)
@@ -675,6 +767,18 @@ bool SerializationManager::IsAnimationLooped(void)
 	return LoopAnimationFlag;
 }
 
+float SerializationManager::GetAnimationPlaySpeed(void)
+{
+	return PlaySpeed;
+}
+
+void SerializationManager::SetAnimationPlaySpeed(float Speed)
+{
+	PlaySpeed = Speed;
+
+	Form::GetInstance().UpdateTimeline();
+}
+
 // Utils
 
 wstring s2ws(const string& str)
@@ -689,13 +793,13 @@ string ws2s(const wstring& wstr)
 	return Result;
 }
 
-float attribute_float_value(XMLElement* Element, const char* AttributeName) {
+float attribute_float_value(XMLElement* Element, const char* AttributeName, float DefaultValue = 0.0f) {
 
 	float Result;
 
 	const XMLAttribute* Attribute = Element->FindAttribute(AttributeName);
 	if (Attribute == nullptr || Attribute->QueryFloatValue(&Result) != XML_SUCCESS)
-		Result = 0.0f;
+		Result = DefaultValue;
 
 	return Result;
 }
@@ -795,7 +899,7 @@ void SerializationManager::LoadFromFile(wstring FileName)
 	Form::GetInstance().UpdateTimeline();
 }
 
-void SerializationManager::SaveToFile(wstring FileName)
+void SerializationManager::SaveToFile(wstring FileName, bool Delay)
 {
 	FileName = ChangeFileExt(FileName, L".xml");
 
@@ -804,7 +908,7 @@ void SerializationManager::SaveToFile(wstring FileName)
 		SingleSerializedState& State = GetCurrentHistory()->CurrentState;
 		State.HaveCharState = true;
 		State.HaveInputState = true;
-		State.HaveAnimationState = true;
+		State.HavePoseState = true;
 		State.HaveRenderState = true;
 		Serialize();
 	}
@@ -816,24 +920,22 @@ void SerializationManager::SaveToFile(wstring FileName)
 		State.HaveRenderState = true;
 	}
 
-	XMLDocument Document;
+	if (Delay) {
+		FileSaveRequest* Request = new FileSaveRequest();
+		Request->Histories = Histories;
+		Serialize(Request->State);
+		Request->FileName = FileName;
 
-	XMLNode* Root = Document.NewElement("Root");
-	Document.InsertFirstChild(Root);
-
-	for (SerializedStateHistory& States : Histories) {
-
-		XMLElement* StatesElement = Document.NewElement("States");
-		Root->InsertEndChild(StatesElement);
-
-		SaveStates(States, Document, StatesElement);
+		DelayedFileSaveRequests.enqueue(Request);
 	}
+	else {
+		FileSaveRequest Request;
+		Request.Histories = Histories;
+		Serialize(Request.State);
+		Request.FileName = FileName;
 
-	SerializeSerializedState State;
-	Serialize(State);
-	State.SaveToXML(Document, Root);
-
-	SafeSaveDocumentToFile(Document, FileName, MaxBackupCount);
+		ExecuteFileSaveRequest(Request);
+	}
 
 	if (LastFileName != FileName) {
 
@@ -884,7 +986,7 @@ void SerializationManager::LoadState(SingleSerializedState& State, XMLDocument& 
 {
 	State.HaveCharState = false;
 	State.HaveInputState = false;
-	State.HaveAnimationState = false;
+	State.HavePoseState = false;
 	State.HaveRenderState = false;
 
 	XMLElement* Pending = Root->FirstChildElement("Pending");
@@ -897,8 +999,8 @@ void SerializationManager::LoadState(SingleSerializedState& State, XMLDocument& 
 	if (State.InputState.LoadFromXML(Document, Root))
 		State.HaveInputState = true;
 
-	if (State.AnimationState.LoadFromXML(Document, Root))
-		State.HaveAnimationState = true;
+	if (State.PoseState.LoadFromXML(Document, Root))
+		State.HavePoseState = true;
 
 	if (State.RenderState.LoadFromXML(Document, Root))
 		State.HaveRenderState = true;
@@ -914,8 +1016,8 @@ void SerializationManager::SaveState(SingleSerializedState& State, XMLDocument& 
 		State.CharState.SaveToXML(Document, Root);
 	if (State.HaveInputState)
 		State.InputState.SaveToXML(Document, Root);
-	if (State.HaveAnimationState)
-		State.AnimationState.SaveToXML(Document, Root);
+	if (State.HavePoseState)
+		State.PoseState.SaveToXML(Document, Root);
 	if (State.HaveRenderState)
 		State.RenderState.SaveToXML(Document, Root);
 }
@@ -1126,17 +1228,17 @@ bool InputSerializedState::LoadFromXML(XMLDocument& Document, XMLNode* Root)
 	return true;
 }
 
-// AnimationSerializedState
+// PoseSerializedState
 
-void AnimationSerializedState::SaveToXML(XMLDocument& Document, XMLNode* Root)
+void PoseSerializedState::SaveToXML(XMLDocument& Document, XMLNode* Root)
 {
-	XMLNode* AnimationState = Document.NewElement("AnimationState");
+	XMLNode* PoseState = Document.NewElement("PoseState");
 
-	for (SerializedAnimationContext& Context : Contexts) {
+	for (SerializedPoseContext& Context : Contexts) {
 
 		XMLElement* ContextElement = Document.NewElement("Context");
 		ContextElement->SetAttribute("Name", ws2s(Context.BoneName).c_str());
-		AnimationState->InsertEndChild(ContextElement);
+		PoseState->InsertEndChild(ContextElement);
 
 		XMLElement* Blocking = Document.NewElement("Blocking");
 		Blocking->SetAttribute("XPos", Context.Blocking.XPos);
@@ -1164,20 +1266,20 @@ void AnimationSerializedState::SaveToXML(XMLDocument& Document, XMLNode* Root)
 		ContextElement->InsertEndChild(DestWorldPoint);
 	}
 
-	Root->InsertEndChild(AnimationState);
+	Root->InsertEndChild(PoseState);
 }
 
-bool AnimationSerializedState::LoadFromXML(XMLDocument& Document, XMLNode* Root)
+bool PoseSerializedState::LoadFromXML(XMLDocument& Document, XMLNode* Root)
 {
 	*this = { };
 
-	XMLNode* AnimationState = Root->FirstChildElement("AnimationState");
-	if (AnimationState == nullptr)
+	XMLNode* PoseState = Root->FirstChildElement("PoseState");
+	if (PoseState == nullptr)
 		return false;
 
-	for (auto BoneElement : selection(AnimationState->ToElement(), "Context")) {
+	for (auto BoneElement : selection(PoseState->ToElement(), "Context")) {
 
-		SerializedAnimationContext SerializedContext = {};
+		SerializedPoseContext SerializedContext = {};
 
 		SerializedContext.BoneName = s2ws(attribute_value(BoneElement, "Name"));
 
@@ -1271,6 +1373,7 @@ void SerializeSerializedState::SaveToXML(XMLDocument& Document, XMLNode* Root)
 	Animation->SetAttribute("KinematicMode", this->KinematicModeFlag);
 	Animation->SetAttribute("Loop", this->LoopAnimationFlag);
 	Animation->SetAttribute("Play", this->PlayAnimaionFlag);
+	Animation->SetAttribute("Speed", this->PlaySpeed);
 	SerializeState->InsertEndChild(Animation);
 
 	Root->InsertEndChild(SerializeState);
@@ -1291,6 +1394,7 @@ bool SerializeSerializedState::LoadFromXML(XMLDocument& Document, XMLNode* Root)
 		this->KinematicModeFlag = attribute_bool_value(Animation, "KinematicMode", false);
 		this->LoopAnimationFlag = attribute_bool_value(Animation, "Loop", false);
 		this->PlayAnimaionFlag = attribute_bool_value(Animation, "Play", false);
+		this->PlaySpeed = attribute_float_value(Animation, "Speed", 1);
 	}
 
 	return true;

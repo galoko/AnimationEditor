@@ -320,13 +320,13 @@ void PhysicsManager::SetBoneAngles(Bone* Bone, vec3 Angles)
 PhysicsManager::GimbalLockFixType PhysicsManager::GetGimbalLockFixType(vec3 LowLimit, vec3 HighLimit)
 {
 	vec3 Ranges = vec3(
-		max(fabs(LowLimit.x), fabs(HighLimit.x)),
-		max(fabs(LowLimit.y), fabs(HighLimit.y)),
-		max(fabs(LowLimit.z), fabs(HighLimit.z))
+		std::max(fabs(LowLimit.x), fabs(HighLimit.x)),
+		std::max(fabs(LowLimit.y), fabs(HighLimit.y)),
+		std::max(fabs(LowLimit.z), fabs(HighLimit.z))
 	);
 
-	float MinRange = min(min(Ranges.x, Ranges.y), Ranges.z);
-	float MaxRange = max(max(Ranges.x, Ranges.y), Ranges.z);
+	float MinRange = std::min(std::min(Ranges.x, Ranges.y), Ranges.z);
+	float MaxRange = std::max(std::max(Ranges.x, Ranges.y), Ranges.z);
 
 	if (MinRange > radians(80.0f))
 		throw new runtime_error("Too large angle range");
@@ -502,8 +502,8 @@ btRigidBody* PhysicsManager::AddDynamicBox(mat4 Transform, vec3 Size, float Mass
 	btRigidBody::btRigidBodyConstructionInfo BodyDef(Mass, MotionState, Shape, LocalInertia);
 	btRigidBody* Body = new btRigidBody(BodyDef);
 
-	float MinSize = min(min(Size.x, Size.y), Size.z);
-	float MaxSize = max(max(Size.x, Size.y), Size.z);
+	float MinSize = std::min(std::min(Size.x, Size.y), Size.z);
+	float MaxSize = std::max(std::max(Size.x, Size.y), Size.z);
 	// Body->setCcdMotionThreshold(MinSize * 0.1);
 	// Body->setCcdSweptSphereRadius(MinSize * 0.1f);
 	Body->setFriction(1.0);
